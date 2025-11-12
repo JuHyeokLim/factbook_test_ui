@@ -110,64 +110,58 @@ export function MediaTab({ factbookId }: MediaTabProps) {
   return (
     <div className="space-y-6">
       {/* 필터 영역 */}
-      <div className="space-y-3">
-        {/* 회사 탭 - 가운데 정렬 */}
-        <div className="flex justify-center">
-          <div className="flex gap-2">
-            {companies.map((company) => (
-              <Button
-                key={company.id}
-                variant={selectedCompany === company.id ? "default" : "outline"}
-                onClick={() => setSelectedCompany(company.id)}
-                className="whitespace-nowrap"
-              >
-                {company.name}
-              </Button>
-            ))}
-          </div>
+      <div className="flex items-center justify-between gap-6">
+        {/* 왼쪽: 회사 탭 */}
+        <div className="flex gap-2">
+          {companies.map((company) => (
+            <Button
+              key={company.id}
+              variant={selectedCompany === company.id ? "default" : "outline"}
+              onClick={() => setSelectedCompany(company.id)}
+              className="whitespace-nowrap"
+            >
+              {company.name}
+            </Button>
+          ))}
         </div>
 
-        {/* 필터 - 오른쪽 정렬 */}
-        <div className="flex justify-end gap-3">
-          <div className="w-48">
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((period) => (
-                  <SelectItem key={period.value} value={period.value}>
-                    {period.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-48">
-            <Select value="custom" onValueChange={() => {}}>
-              <SelectTrigger>
-                <SelectValue>{selectedMediaText}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {mediaOptions.map((media) => (
-                  <div
-                    key={media}
-                    className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted cursor-pointer"
-                    onClick={() => toggleMedia(media)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedMedia.includes(media)}
-                      onChange={() => toggleMedia(media)}
-                      className="rounded"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <span className="text-sm">{media}</span>
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        {/* 오른쪽: 기간/매체 필터 */}
+        <div className="flex gap-3">
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {periods.map((period) => (
+                <SelectItem key={period.value} value={period.value}>
+                  {period.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value="custom" onValueChange={() => {}}>
+            <SelectTrigger className="w-40">
+              <SelectValue>{selectedMediaText}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {mediaOptions.map((media) => (
+                <div
+                  key={media}
+                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted cursor-pointer"
+                  onClick={() => toggleMedia(media)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedMedia.includes(media)}
+                    onChange={() => toggleMedia(media)}
+                    className="rounded"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span className="text-sm">{media}</span>
+                </div>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

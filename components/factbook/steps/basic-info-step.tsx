@@ -77,7 +77,11 @@ export function BasicInfoStep({ method, setMethod, formData, setFormData }: Basi
           </div>
 
           <div className="pt-2">
-            <Button variant="link" className="text-sm text-primary p-0 h-auto">
+            <Button 
+              variant="link" 
+              className="text-sm text-primary p-0 h-auto"
+              onClick={() => setMethod("upload")}
+            >
               RFP 파일로하기
             </Button>
           </div>
