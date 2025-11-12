@@ -1,0 +1,275 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MoreVertical, Eye, Grid3x3, List } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
+
+interface Factbook {
+  id: string
+  companyName: string
+  productName: string
+  category: string
+  status: "generating" | "completed"
+  createdAt: string
+  updatedAt: string
+  viewCount: number
+}
+
+export function FactbookList() {
+  const [factbooks, setFactbooks] = useState<Factbook[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [category, setCategory] = useState("all")
+  const [sortBy, setSortBy] = useState("recent")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid") // added view mode state
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    // Mock data for demonstration
+    const mockFactbooks: Factbook[] = [
+      {
+        id: "1",
+        companyName: "LG 헬로비전",
+        productName: "케이블TV, 인터넷전화",
+        category: "컴퓨터및정보통신",
+        status: "completed",
+        createdAt: "2025-10-30",
+        updatedAt: "2025-10-30",
+        viewCount: 45,
+      },
+      {
+        id: "2",
+        companyName: "Samsung Electronics",
+        productName: "스마트폰, 가전제품",
+        category: "가정용전기전자",
+        status: "generating",
+        createdAt: "2025-10-29",
+        updatedAt: "2025-10-29",
+        viewCount: 23,
+      },
+    ]
+    setFactbooks(mockFactbooks)
+    setLoading(false)
+  }, [])
+
+  const filteredFactbooks = factbooks
+    .filter(
+      (fb) =>
+        fb.companyName.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        (category === "all" || fb.category === category),
+    )
+    .sort((a, b) => {
+      if (sortBy === "recent") {
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      } else if (sortBy === "popular") {
+        return b.viewCount - a.viewCount
+      } else {
+        return a.companyName.localeCompare(b.companyName)
+      }
+    })
+
+  const handleShare = (companyName: string) => {
+    const shareUrl = `${window.location.origin}/factbook/${companyName}`
+    navigator.clipboard.writeText(shareUrl)
+    toast({
+      title: "공유링크가 복사되었습니다.",
+      duration: 1000,
+    })
+  }
+
+  const handleDelete = (id: string) => {
+    setFactbooks(factbooks.filter((fb) => fb.id !== id))
+    toast({
+      title: "팩트북이 삭제되었습니다.",
+      duration: 1000,
+    })
+  }
+
+  if (loading) {
+    return <div className="text-center py-12 text-muted-foreground">팩트북이 없습니다</div>
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4 items-end">
+        <Input
+          placeholder="기업명으로 팩트북을 검색하세요"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1"
+        />
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger className="w-full md:w-48">
+            <SelectValue placeholder="업종 선택" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[400px]">
+            <SelectItem value="all">모든 업종</SelectItem>
+            <SelectItem value="기초재">기초재</SelectItem>
+            <SelectItem value="식품">식품</SelectItem>
+            <SelectItem value="음료및기호식품">음료 및 기호식품</SelectItem>
+            <SelectItem value="제약및의료">제약 및 의료</SelectItem>
+            <SelectItem value="화장품및보건용품">화장품 및 보건용품</SelectItem>
+            <SelectItem value="출판">출판</SelectItem>
+            <SelectItem value="패션">패션</SelectItem>
+            <SelectItem value="산업기기">산업기기</SelectItem>
+            <SelectItem value="정밀기기및사무기기">정밀기기 및 사무기기</SelectItem>
+            <SelectItem value="가정용전기전자">가정용 전기전자</SelectItem>
+            <SelectItem value="컴퓨터및정보통신">컴퓨터 및 정보통신</SelectItem>
+            <SelectItem value="수송기기">수송기기</SelectItem>
+            <SelectItem value="가정용품">가정용품</SelectItem>
+            <SelectItem value="화학공업">화학공업</SelectItem>
+            <SelectItem value="건설건재및부동산">건설, 건재 및 부동산</SelectItem>
+            <SelectItem value="유통">유통</SelectItem>
+            <SelectItem value="금융보험및증권">금융, 보험 및 증권</SelectItem>
+            <SelectItem value="서비스">서비스</SelectItem>
+            <SelectItem value="관공서및단체">관공서 및 단체</SelectItem>
+            <SelectItem value="교육및복지후생">교육 및 복지후생</SelectItem>
+            <SelectItem value="그룹및기업광고">그룹 및 기업광고</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full md:w-48">
+            <SelectValue placeholder="정렬" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">최근 업데이트</SelectItem>
+            <SelectItem value="popular">인기순</SelectItem>
+            <SelectItem value="name">가나다순</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="flex gap-2 border border-border rounded-md p-1">
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("grid")}
+            title="그리드 보기"
+          >
+            <Grid3x3 className="w-4 h-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            title="리스트 보기"
+          >
+            <List className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Results Count */}
+      <div className="text-sm text-muted-foreground">총 {filteredFactbooks.length}개</div>
+
+      {/* Factbook Grid or List */}
+      {filteredFactbooks.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📚</div>
+          <p className="text-lg font-medium text-foreground mb-2">팩트북이 없습니다</p>
+          <p className="text-sm text-muted-foreground">새로운 팩트북을 생성해보세요.</p>
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredFactbooks.map((factbook) => (
+            <Card key={factbook.id} className="p-6 hover:shadow-lg transition-shadow flex flex-col">
+              <div className="space-y-4 flex-1">
+                <div>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-lg text-foreground">{factbook.companyName}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{factbook.productName}</p>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleShare(factbook.companyName)}>공유</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(factbook.id)} className="text-destructive">
+                          삭제
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <span className="inline-block text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
+                    {factbook.category}
+                  </span>
+                </div>
+
+                {factbook.status === "generating" ? (
+                  <div className="text-sm text-muted-foreground">데이터 불러오는 중...</div>
+                ) : (
+                  <Link href={`/factbook/${factbook.id}`} className="block">
+                    <Button className="w-full gap-2 bg-transparent" variant="outline">
+                      <Eye className="w-4 h-4" />
+                      팩트북 보기
+                    </Button>
+                  </Link>
+                )}
+
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>생성: {factbook.createdAt}</p>
+                  <p>조회: {factbook.viewCount}회</p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredFactbooks.map((factbook) => (
+            <Card key={factbook.id} className="p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-foreground">{factbook.companyName}</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-1">{factbook.productName}</p>
+                  <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                    <span>{factbook.category}</span>
+                    <span>생성: {factbook.createdAt}</span>
+                    <span>조회: {factbook.viewCount}회</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {factbook.status === "generating" ? (
+                    <div className="text-sm text-muted-foreground">로딩 중...</div>
+                  ) : (
+                    <Link href={`/factbook/${factbook.id}`}>
+                      <Button size="sm" variant="outline" className="gap-1 bg-transparent">
+                        <Eye className="w-4 h-4" />
+                        보기
+                      </Button>
+                    </Link>
+                  )}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleShare(factbook.companyName)}>공유</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDelete(factbook.id)} className="text-destructive">
+                        삭제
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
