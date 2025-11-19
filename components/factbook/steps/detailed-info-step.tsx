@@ -107,7 +107,7 @@ export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProp
           {formData.proposals.map((proposal: string, idx: number) => (
             <div key={idx} className="flex gap-2">
               <Input
-                placeholder={`RFP에서 자동 추출된 제안 내용 ${idx + 1}`}
+                placeholder={`제안 내용을 입력하세요.`}
                 value={proposal}
                 onChange={(e) => handleUpdateProposal(idx, e.target.value)}
                 className="flex-1"
@@ -146,7 +146,7 @@ export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProp
           {formData.competitors.map((competitor: string, idx: number) => (
             <div key={idx} className="flex gap-2">
               <Input
-                placeholder={`AI가 제안하는 경쟁사 ${idx + 1}`}
+                placeholder={`경쟁사를 입력하세요.`}
                 value={competitor}
                 onChange={(e) => handleUpdateCompetitor(idx, e.target.value)}
                 className="flex-1"
@@ -185,7 +185,7 @@ export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProp
           {formData.targetUsers.map((target: string, idx: number) => (
             <div key={idx} className="flex gap-2">
               <Input
-                placeholder={`RFP에서 자동 추출된 타겟 사용자 ${idx + 1}`}
+                placeholder={`타겟 사용자를 입력하세요.`}
                 value={target}
                 onChange={(e) => handleUpdateTarget(idx, e.target.value)}
                 className="flex-1"

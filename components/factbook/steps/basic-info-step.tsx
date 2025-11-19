@@ -42,13 +42,35 @@ export function BasicInfoStep({ method, setMethod, formData, setFormData }: Basi
       {/* RFP 업로드 모드 */}
       {method === "upload" && (
         <div className="space-y-4">
-          <RfpUploadStep />
+          <RfpUploadStep
+            onExtractedData={(data) => {
+              // 추출된 데이터로 폼 자동 채우기
+              if (data) {
+                setFormData({
+                  ...formData,
+                  companyName: data.company_name || formData.companyName,
+                  productName: data.product_name || formData.productName,
+                  // 배열이 비어있지 않으면 사용, 비어있으면 기존 값 유지
+                  proposals: data.proposals && data.proposals.length > 0 ? data.proposals : formData.proposals,
+                  competitors: data.competitors && data.competitors.length > 0 ? data.competitors : formData.competitors,
+                  targetUsers: data.target_users && data.target_users.length > 0 ? data.target_users : formData.targetUsers,
+                  // 메뉴 항목 추천도 함께 저장
+                  menuItems: data.menu_recommendations || formData.menuItems,
+                  // 매체 소재 분석 요구사항이 있으면 On으로 설정
+                  analysisItems: {
+                    ...formData.analysisItems,
+                    media: data.requires_media_analysis ?? formData.analysisItems?.media ?? false,
+                  },
+                })
+              }
+            }}
+          />
           <div className="text-xs text-center text-muted-foreground">
             RFP를 여기에 끌어다놓거나
             <br />
             파일 선택 버튼을 눌러주세요.
             <br />
-            (10MB 이하의 pdf, pptx, docx, hwp)
+            (10MB 이하의 pdf, pptx, docx)
           </div>
         </div>
       )}

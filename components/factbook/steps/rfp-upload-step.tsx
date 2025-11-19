@@ -16,7 +16,6 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
   const { toast } = useToast()
 
   const handleDrag = (e: React.DragEvent) => {
@@ -42,7 +41,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
       } else {
         toast({
           title: "유효하지 않은 파일입니다.",
-          description: "10MB 이하의 pdf, pptx, docx, hwp 파일만 업로드 가능합니다.",
+          description: "10MB 이하의 pdf, pptx, docx 파일만 업로드 가능합니다.",
           variant: "destructive",
         })
       }
@@ -50,7 +49,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
   }
 
   const isValidFile = (file: File): boolean => {
-    const validExtensions = [".pdf", ".pptx", ".docx", ".hwp"]
+    const validExtensions = [".pdf", ".pptx", ".docx"]
     const hasValidExtension = validExtensions.some((ext) => file.name.endsWith(ext))
     return hasValidExtension && file.size <= 10 * 1024 * 1024
   }
@@ -61,33 +60,50 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
 
     // 자동 업로드 시작
     setUploading(true)
-    setUploadProgress(30)
 
     try {
       const formData = new FormData()
       formData.append("file", selectedFile)
 
-      setUploadProgress(60)
-
-      const response = await fetch("/api/upload", {
+      // FastAPI 백엔드 직접 호출
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+      const response = await fetch(`${backendUrl}/api/extract-rfp`, {
         method: "POST",
         body: formData,
       })
 
       if (!response.ok) {
-        throw new Error("업로드 실패")
+        const errorData = await response.json().catch(() => ({ detail: "업로드 실패" }))
+        throw new Error(errorData.detail || errorData.message || "업로드 실패")
       }
 
-      const data = await response.json()
-      setUploadProgress(100)
+      const result = await response.json()
 
+      // 에러가 있는 경우 표시
+      if (result.error) {
+        console.error("RFP 파싱 에러:", result.error)
+        toast({
+          title: "RFP 파싱 중 에러 발생",
+          description: `${result.error.type || "에러"}: ${result.error.message || "알 수 없는 에러"}`,
+          variant: "destructive",
+        })
+      }
+
+      // 백엔드 응답 형식: { success: true, data: {...}, menu_recommendations: {...} }
+      const extractedData = {
+        ...(result.data || result),
+        menu_recommendations: result.menu_recommendations, // 메뉴 추천도 함께 전달
+      }
+      
       // 추출된 데이터 전달
-      onExtractedData?.(data)
+      onExtractedData?.(extractedData)
 
-      toast({
-        title: "파일 업로드 완료",
-        description: "RFP에서 정보를 추출했습니다.",
-      })
+      if (!result.error) {
+        toast({
+          title: "파일 업로드 완료",
+          description: "RFP에서 정보를 추출했습니다.",
+        })
+      }
 
       // 자동으로 다음 단계로 이동
       setTimeout(() => {
@@ -96,10 +112,10 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
     } catch (error) {
       console.error("Upload error:", error)
       setUploading(false)
-      setUploadProgress(0)
+      const errorMessage = error instanceof Error ? error.message : "파일 업로드 중 오류가 발생했습니다."
       toast({
         title: "업로드 실패",
-        description: "파일 업로드 중 오류가 발생했습니다.",
+        description: errorMessage,
         variant: "destructive",
       })
     }
@@ -126,12 +142,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
         {uploading ? (
           <div className="space-y-3">
             <Loader2 className="w-10 h-10 text-primary mx-auto animate-spin" />
-            <div>
-              <p className="font-medium">파일 업로드 중...</p>
-              <div className="w-full bg-muted rounded-full h-2 mt-2 overflow-hidden">
-                <div className="bg-primary h-full transition-all" style={{ width: `${uploadProgress}%` }} />
-              </div>
-            </div>
+            <p className="font-medium">파일 업로드 중...</p>
           </div>
         ) : file ? (
           <div className="space-y-2">
@@ -150,13 +161,13 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
             <Upload className="w-10 h-10 text-muted-foreground mx-auto" />
             <div>
               <p className="font-medium">RFP를 여기에 끌어다놓으세요</p>
-              <p className="text-sm text-muted-foreground">또는 파일을 선택하세요 (10MB 이하의 pdf, pptx, docx, hwp)</p>
+              <p className="text-sm text-muted-foreground">또는 파일을 선택하세요 (10MB 이하의 pdf, pptx, docx)</p>
             </div>
             <label>
               <Button variant="outline" asChild>
                 <span>파일 선택</span>
               </Button>
-              <input type="file" hidden accept=".pdf,.pptx,.docx,.hwp" onChange={handleFileInput} />
+              <input type="file" hidden accept=".pdf,.pptx,.docx" onChange={handleFileInput} />
             </label>
           </div>
         )}

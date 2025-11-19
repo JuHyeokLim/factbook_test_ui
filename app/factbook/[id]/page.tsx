@@ -7,17 +7,26 @@ import { ArrowLeft, ArrowUp } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { MediaTab } from "@/components/factbook/media-tab"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { ImageViewer } from "@/components/factbook/image-viewer"
 
 interface Source {
   title: string
   content: string
   media: string
+  imageUrl?: string
+}
+
+interface SubSection {
+  id: string
+  title: string
+  content: string
 }
 
 interface Section {
   id: string
   title: string
-  content: string
+  subSections: SubSection[]
   sources: Source[]
 }
 
@@ -32,9 +41,10 @@ interface FactbookDetail {
 export default function FactbookDetailPage() {
   const params = useParams()
   const [factbook, setFactbook] = useState<FactbookDetail | null>(null)
-  const [activeSection, setActiveSection] = useState<string>("1")
+  const [activeSection, setActiveSection] = useState<string>("1-1")
   const [activeTab, setActiveTab] = useState<"factbook" | "media">("factbook")
   const [showScrollButton, setShowScrollButton] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -46,35 +56,74 @@ export default function FactbookDetailPage() {
       sections: [
         {
           id: "1",
-          title: "기업 기본정보",
-          content:
-            "LG헬로비전은 1995년 3월 31일 종합유선방송법에 의해 설립되어 종합유선방송국운영사업, 비디오물, 광고, CF의 제작판매 및 전기통신사업법상 기간통신사업, 별정통신사업과 부가통신사업 등을 주요사업으로 영위하고 있습니다.",
+          title: "기업 정보",
+          subSections: [
+            {
+              id: "1-1",
+              title: "기본 정보",
+              content: "회사명: LG헬로비전 주식회사\n설립일: 1995년 3월 31일\n대표자: 송구영\n주소: 서울특별시 마포구 월드컵북로 56길 19 (상암동 드림타워)\n홈페이지: www.lghellovision.net",
+            },
+            {
+              id: "1-2",
+              title: "철학 및 비전",
+              content: "LG헬로비전은 고객 중심의 서비스와 혁신을 통해 디지털 미디어 플랫폼의 선도 기업이 되겠습니다.",
+            },
+            {
+              id: "1-3",
+              title: "역사",
+              content: "1995년 3월 31일 설립, 국내 케이블TV 방송 사업 시작",
+            },
+          ],
           sources: [
             {
               title: "회사의 개요",
               content: "당사의 명칭은 주식회사엘지헬로비전이며, 영문으로는 LG HelloVisionCorp.",
               media: "대홍뉴스",
+              imageUrl: "/placeholder.jpg",
             },
           ],
         },
         {
           id: "2",
-          title: "시장현황",
-          content:
-            "2025년 6월말 연결누적기준 사업부문별 주요서비스실적은 방송사업 21.1%, 인터넷사업 9.5%, 광고서비스사업 18.3%, 부가서비스사업 19.9%, 상품 31.2% 입니다.",
+          title: "시장 현황",
+          subSections: [
+            {
+              id: "2-1",
+              title: "방송통신 산업 현황 및 트렌드",
+              content: "2025년 6월말 연결누적기준 사업부문별 주요서비스실적은 방송사업 21.1%, 인터넷사업 9.5%, 광고서비스사업 18.3%, 부가서비스사업 19.9%, 상품 31.2% 입니다.",
+            },
+          ],
           sources: [
             {
               title: "한국 방송통신 시장 현황",
               content: "2024년 상반기 케이블 방송 시장 분석",
               media: "롯데인사이트",
+              imageUrl: "/placeholder.jpg",
             },
           ],
         },
         {
           id: "3",
+          title: "자사 분석",
+          subSections: [
+            {
+              id: "3-1",
+              title: "가입자 수, 시장 점유율 및 서비스별 실적",
+              content: "LG헬로비전은 전국적으로 약 500만 가입자를 보유하고 있으며, 케이블TV 시장 점유율 15%를 차지하고 있습니다.",
+            },
+          ],
+          sources: [],
+        },
+        {
+          id: "4",
           title: "경쟁사 분석",
-          content:
-            "주요 경쟁사인 SK브로드밴드, LG U+와의 경쟁이 심화되고 있습니다. 각 사는 초고속 인터넷과 OTT 서비스를 결합한 패키지 전략으로 고객 확보에 집중하고 있습니다.",
+          subSections: [
+            {
+              id: "4-1",
+              title: "주요 경쟁사 비교",
+              content: "주요 경쟁사인 SK브로드밴드, LG U+와의 경쟁이 심화되고 있습니다. 각 사는 초고속 인터넷과 OTT 서비스를 결합한 패키지 전략으로 고객 확보에 집중하고 있습니다.",
+            },
+          ],
           sources: [
             {
               title: "케이블 사업자별 경쟁 전략",
@@ -84,17 +133,16 @@ export default function FactbookDetailPage() {
           ],
         },
         {
-          id: "4",
-          title: "소재 분석",
-          content:
-            "LG헬로비전의 광고 소재는 전통 매체(TV, 신문)와 디지털 매체(인터넷, 모바일)를 통합하여 활용하고 있습니다. 최근 디지털 매체 비중이 증가하고 있으며, 영상 기반 광고 효과가 높게 평가되고 있습니다.",
-          sources: [
+          id: "5",
+          title: "타겟 분석",
+          subSections: [
             {
-              title: "디지털 광고 소재 트렌드",
-              content: "2024년 광고 매체별 투자 동향",
-              media: "롯데인사이트",
+              id: "5-1",
+              title: "주요 고객 세그먼트 및 특성",
+              content: "주요 타겟은 30-50대 가구주로, 가정용 통신 서비스와 엔터테인먼트 콘텐츠에 높은 관심을 보입니다.",
             },
           ],
+          sources: [],
         },
       ],
     }
@@ -140,6 +188,14 @@ export default function FactbookDetailPage() {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
+  const handleSubSectionClick = (subSectionId: string) => {
+    setActiveSection(subSectionId)
+    const element = document.getElementById(`section-${subSectionId}`)
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }
+
   if (!factbook) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -148,15 +204,32 @@ export default function FactbookDetailPage() {
     )
   }
 
-  const sectionColors = {
-    "1": { badge: "bg-blue-600", text: "text-blue-600", light: "bg-blue-100" },
-    "2": { badge: "bg-emerald-600", text: "text-emerald-600", light: "bg-emerald-100" },
-    "3": { badge: "bg-orange-600", text: "text-orange-600", light: "bg-orange-100" },
-    "4": { badge: "bg-pink-600", text: "text-pink-600", light: "bg-pink-100" },
+  const allImages = factbook.sections.flatMap((section) =>
+    section.sources.filter((s) => s.imageUrl).map((s) => s.imageUrl!)
+  )
+
+  const handleImageClick = (imageUrl: string) => {
+    const index = allImages.indexOf(imageUrl)
+    if (index !== -1) {
+      setSelectedImageIndex(index)
+    }
   }
 
-  const activeColor = sectionColors[activeSection as keyof typeof sectionColors] || sectionColors["1"]
-  const activeSectionData = factbook.sections.find((s) => s.id === activeSection)
+  const handleCloseImageViewer = () => {
+    setSelectedImageIndex(null)
+  }
+
+  const handlePreviousImage = () => {
+    if (selectedImageIndex !== null && selectedImageIndex > 0) {
+      setSelectedImageIndex(selectedImageIndex - 1)
+    }
+  }
+
+  const handleNextImage = () => {
+    if (selectedImageIndex !== null && selectedImageIndex < allImages.length - 1) {
+      setSelectedImageIndex(selectedImageIndex + 1)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -231,26 +304,35 @@ export default function FactbookDetailPage() {
               <h3 className="font-bold text-slate-900 text-sm">목차</h3>
             </div>
 
-            <nav className="space-y-2">
-              {factbook.sections.map((section, idx) => {
-                const isActive = activeSection === section.id
-                const colors = sectionColors[section.id as keyof typeof sectionColors]
-
-                return (
-                  <button
-                    key={section.id}
-                    onClick={() => setActiveSection(section.id)}
-                    className={`w-full text-left px-3 py-2 rounded text-sm font-medium transition-all flex items-center gap-2 ${
-                      isActive
-                        ? `bg-blue-100 text-blue-700 border-l-2 border-blue-600`
-                        : "text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span className="flex-1">{section.title}</span>
-                  </button>
-                )
-              })}
-            </nav>
+            <Accordion type="single" collapsible className="w-full">
+              {factbook.sections.map((section, idx) => (
+                <AccordionItem key={section.id} value={section.id}>
+                  <AccordionTrigger className="text-sm font-medium text-slate-900 py-2">
+                    {idx + 1}. {section.title}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-1 pl-2">
+                      {section.subSections.map((subSection) => {
+                        const isActive = activeSection === subSection.id
+                        return (
+                          <button
+                            key={subSection.id}
+                            onClick={() => handleSubSectionClick(subSection.id)}
+                            className={`w-full text-left px-2 py-1.5 rounded text-xs transition-all ${
+                              isActive
+                                ? "bg-blue-100 text-blue-700 font-medium"
+                                : "text-slate-600 hover:bg-slate-100"
+                            }`}
+                          >
+                            {subSection.title}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </aside>
         )}
 
@@ -258,27 +340,32 @@ export default function FactbookDetailPage() {
         <div className="flex-1 overflow-y-auto">
           <div className="p-8">
             {activeTab === "factbook" ? (
-              <div className="max-w-3xl space-y-8">
-                {activeSectionData && (
-                  <section>
-                    {/* 섹션 제목 */}
-                    <div className="mb-6">
-                      <h2 className="text-xl font-bold text-slate-900">{activeSectionData.title}</h2>
-                    </div>
-
-                    {/* 섹션 콘텐츠 */}
-                    <div className="space-y-6">
-                      <p className="text-slate-700 text-sm leading-relaxed">{activeSectionData.content}</p>
-
-                      {/* 플레이스홀더 바 (기획서처럼) */}
-                      <div className="space-y-3 mt-8">
-                        <div className="h-3 bg-slate-200 rounded w-2/3"></div>
-                        <div className="h-3 bg-slate-200 rounded w-3/4"></div>
-                        <div className="h-3 bg-slate-200 rounded w-1/2"></div>
-                      </div>
-                    </div>
-                  </section>
-                )}
+              <div className="max-w-3xl space-y-12">
+                {factbook.sections.map((section) => (
+                  <div key={section.id}>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-6">{section.title}</h2>
+                    {section.subSections.map((subSection) => (
+                      <section
+                        key={subSection.id}
+                        id={`section-${subSection.id}`}
+                        className="mb-8 scroll-mt-8"
+                      >
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">{subSection.title}</h3>
+                        <div className="space-y-4">
+                          <div className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
+                            {subSection.content}
+                          </div>
+                          {/* 플레이스홀더 바 (기획서처럼) */}
+                          <div className="space-y-3 mt-4">
+                            <div className="h-3 bg-slate-200 rounded w-2/3"></div>
+                            <div className="h-3 bg-slate-200 rounded w-3/4"></div>
+                            <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                          </div>
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ))}
               </div>
             ) : (
               <MediaTab factbookId={params.id as string} />
@@ -290,21 +377,44 @@ export default function FactbookDetailPage() {
         {activeTab === "factbook" && (
           <aside className="w-56 border-l border-slate-300 bg-slate-50 p-6 overflow-y-auto flex-shrink-0">
             <div className="space-y-6">
+              {/* 출처 이미지 */}
+              {allImages.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-3 text-sm">출처 이미지</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {allImages.map((imageUrl, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleImageClick(imageUrl)}
+                        className="aspect-square bg-slate-200 rounded border border-slate-300 cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center"
+                      >
+                        <span className="text-xs text-slate-500">이미지</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* 출처정보 제목 */}
               <div>
                 <h3 className="font-bold text-slate-900 mb-3 text-sm">출처</h3>
-                {activeSectionData && activeSectionData.sources.length > 0 ? (
+                {factbook.sections
+                  .flatMap((s) => s.sources)
+                  .filter((s) => !s.imageUrl).length > 0 ? (
                   <div className="space-y-3">
-                    {activeSectionData.sources.map((source, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-white p-3 rounded border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
-                      >
-                        <p className="font-semibold text-slate-900 text-xs line-clamp-2">{source.title}</p>
-                        <p className="text-slate-600 text-xs mt-2 line-clamp-2">{source.content}</p>
-                        <p className="text-blue-600 text-xs mt-2 font-medium hover:underline">{source.media}</p>
-                      </div>
-                    ))}
+                    {factbook.sections
+                      .flatMap((s) => s.sources)
+                      .filter((s) => !s.imageUrl)
+                      .map((source, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-white p-3 rounded border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <p className="font-semibold text-slate-900 text-xs line-clamp-2">{source.title}</p>
+                          <p className="text-slate-600 text-xs mt-2 line-clamp-2">{source.content}</p>
+                          <p className="text-blue-600 text-xs mt-2 font-medium hover:underline">{source.media}</p>
+                        </div>
+                      ))}
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500">출처 정보가 없습니다.</p>
@@ -335,6 +445,17 @@ export default function FactbookDetailPage() {
         >
           <ArrowUp className="w-5 h-5" />
         </button>
+      )}
+
+      {/* 이미지 전체 화면 보기 팝업 */}
+      {selectedImageIndex !== null && allImages.length > 0 && (
+        <ImageViewer
+          images={allImages}
+          currentIndex={selectedImageIndex}
+          onClose={handleCloseImageViewer}
+          onPrevious={handlePreviousImage}
+          onNext={handleNextImage}
+        />
       )}
     </div>
   )

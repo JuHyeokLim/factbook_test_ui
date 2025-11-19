@@ -10,13 +10,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 파일 검증
-    const validExtensions = [".pdf", ".pptx", ".docx", ".hwp"]
+    const validExtensions = [".pdf", ".pptx", ".docx"]
     const hasValidExtension = validExtensions.some((ext) => file.name.endsWith(ext))
     const maxSize = 10 * 1024 * 1024 // 10MB
 
     if (!hasValidExtension || file.size > maxSize) {
       return NextResponse.json(
-        { error: "유효하지 않은 파일입니다. (10MB 이하의 pdf, pptx, docx, hwp)" },
+        { error: "유효하지 않은 파일입니다. (10MB 이하의 pdf, pptx, docx)" },
         { status: 400 },
       )
     }
@@ -34,12 +34,15 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      throw new Error("RFP 처리 실패")
+      const errorData = await response.json().catch(() => ({ detail: "RFP 처리 실패" }))
+      throw new Error(errorData.detail || "RFP 처리 실패")
     }
 
     const result = await response.json()
 
-    return NextResponse.json(result)
+    // 백엔드 응답 형식: { success: true, data: {...} }
+    // 프론트엔드에서 사용하기 쉽게 data만 반환
+    return NextResponse.json(result.data || result)
   } catch (error) {
     console.error("Upload error:", error)
     return NextResponse.json({ error: "파일 업로드 중 오류가 발생했습니다." }, { status: 500 })

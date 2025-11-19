@@ -22,13 +22,15 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
     competitors: [""],
     targetUsers: [""],
     analysisItems: {
-      media: true,
+      media: false,
     },
-    analysisPrompts: {
-      market: "",
-      ownCompany: "",
-      competitor: "",
-      target: "",
+    menuItems: {},
+    companyInfoItems: {
+      basic: true, // 고정
+      philosophy: true, // 고정
+      history: true, // 고정
+      business: false, // On/Off 가능
+      finance: false, // On/Off 가능
     },
   })
 
@@ -54,7 +56,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`${currentStep === 2 ? "!max-w-[95vw] !w-[95vw] sm:!max-w-[95vw]" : "max-w-2xl"} max-h-[90vh] overflow-y-auto p-6`}>
         <DialogHeader>
           <DialogTitle>팩트북 만들기</DialogTitle>
           {/* Progress Indicator */}
@@ -78,10 +80,17 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
 
         <div className="mt-6 space-y-6">
           {currentStep === 0 && (
-            <BasicInfoStep method={method} setMethod={setMethod} formData={formData} setFormData={setFormData} />
+            <BasicInfoStep
+              method={method}
+              setMethod={setMethod}
+              formData={formData}
+              setFormData={setFormData}
+            />
           )}
 
-          {currentStep === 1 && <DetailedInfoStep formData={formData} setFormData={setFormData} />}
+          {currentStep === 1 && (
+            <DetailedInfoStep formData={formData} setFormData={setFormData} />
+          )}
 
           {currentStep === 2 && <MenuConfigStep formData={formData} setFormData={setFormData} />}
 
