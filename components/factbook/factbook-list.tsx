@@ -15,10 +15,10 @@ interface Factbook {
   companyName: string
   productName: string
   category: string
-  status: "generating" | "completed"
+  status: "draft" | "generating" | "completed" | "failed"
   createdAt: string
   updatedAt: string
-  viewCount: number
+  viewCount?: number
 }
 
 export function FactbookList() {
@@ -31,32 +31,44 @@ export function FactbookList() {
   const { toast } = useToast()
 
   useEffect(() => {
-    // Mock data for demonstration
-    const mockFactbooks: Factbook[] = [
-      {
-        id: "1",
-        companyName: "LG 헬로비전",
-        productName: "케이블TV, 인터넷전화",
-        category: "컴퓨터및정보통신",
-        status: "completed",
-        createdAt: "2025-10-30",
-        updatedAt: "2025-10-30",
-        viewCount: 45,
-      },
-      {
-        id: "2",
-        companyName: "Samsung Electronics",
-        productName: "스마트폰, 가전제품",
-        category: "가정용전기전자",
-        status: "generating",
-        createdAt: "2025-10-29",
-        updatedAt: "2025-10-29",
-        viewCount: 23,
-      },
-    ]
-    setFactbooks(mockFactbooks)
-    setLoading(false)
-  }, [])
+    const fetchFactbooks = async () => {
+      setLoading(true)
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+        const response = await fetch(`${backendUrl}/api/factbooks`)
+        
+        if (!response.ok) {
+          throw new Error("팩트북 목록 조회 실패")
+        }
+        
+        const data = await response.json()
+        
+        // 백엔드 응답 형식을 프론트엔드 형식으로 변환
+        const factbooks: Factbook[] = (data.items || []).map((item: any) => ({
+          id: String(item.id),
+          companyName: item.company_name || "",
+          productName: item.product_name || "",
+          category: item.category || "",
+          status: item.status || "draft",
+          createdAt: item.created_at ? new Date(item.created_at).toLocaleDateString("ko-KR") : "",
+          updatedAt: item.updated_at ? new Date(item.updated_at).toLocaleDateString("ko-KR") : "",
+          viewCount: 0, // 백엔드에 viewCount가 없으므로 0으로 설정
+        }))
+        
+        setFactbooks(factbooks)
+      } catch (error) {
+        console.error("팩트북 목록 조회 실패:", error)
+        toast({
+          title: "팩트북 목록을 불러오는데 실패했습니다.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchFactbooks()
+  }, [toast])
 
   const filteredFactbooks = factbooks
     .filter(
@@ -74,8 +86,8 @@ export function FactbookList() {
       }
     })
 
-  const handleShare = (companyName: string) => {
-    const shareUrl = `${window.location.origin}/factbook/${companyName}`
+  const handleShare = (id: string) => {
+    const shareUrl = `${window.location.origin}/factbook/${id}`
     navigator.clipboard.writeText(shareUrl)
     toast({
       title: "공유링크가 복사되었습니다.",
@@ -83,12 +95,37 @@ export function FactbookList() {
     })
   }
 
-  const handleDelete = (id: string) => {
-    setFactbooks(factbooks.filter((fb) => fb.id !== id))
-    toast({
-      title: "팩트북이 삭제되었습니다.",
-      duration: 1000,
-    })
+  const handleDelete = async (id: string) => {
+    if (!confirm("팩트북을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+      return
+    }
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+      const response = await fetch(`${backendUrl}/api/factbooks/${id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: "삭제 실패" }))
+        throw new Error(errorData.detail || "팩트북 삭제에 실패했습니다.")
+      }
+
+      // 목록에서 제거
+      setFactbooks(factbooks.filter((fb) => fb.id !== id))
+      
+      toast({
+        title: "팩트북이 삭제되었습니다.",
+        duration: 2000,
+      })
+    } catch (error) {
+      console.error("팩트북 삭제 실패:", error)
+      toast({
+        title: "팩트북 삭제에 실패했습니다.",
+        description: error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
   }
 
   if (loading) {
@@ -206,7 +243,14 @@ export function FactbookList() {
                 </div>
 
                 {factbook.status === "generating" ? (
-                  <div className="text-sm text-muted-foreground">데이터 불러오는 중...</div>
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    생성 중...
+                  </div>
+                ) : factbook.status === "failed" ? (
+                  <div className="text-sm text-destructive">생성 실패</div>
+                ) : factbook.status === "draft" ? (
+                  <div className="text-sm text-muted-foreground">초안</div>
                 ) : (
                   <Link href={`/factbook/${factbook.id}`} className="block">
                     <Button className="w-full gap-2 bg-transparent" variant="outline">
@@ -241,7 +285,14 @@ export function FactbookList() {
 
                 <div className="flex items-center gap-2">
                   {factbook.status === "generating" ? (
-                    <div className="text-sm text-muted-foreground">로딩 중...</div>
+                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      생성 중...
+                    </div>
+                  ) : factbook.status === "failed" ? (
+                    <div className="text-sm text-destructive">생성 실패</div>
+                  ) : factbook.status === "draft" ? (
+                    <div className="text-sm text-muted-foreground">초안</div>
                   ) : (
                     <Link href={`/factbook/${factbook.id}`}>
                       <Button size="sm" variant="outline" className="gap-1 bg-transparent">
@@ -258,7 +309,7 @@ export function FactbookList() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleShare(factbook.companyName)}>공유</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleShare(factbook.id)}>공유</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleDelete(factbook.id)} className="text-destructive">
                         삭제
                       </DropdownMenuItem>

@@ -79,29 +79,35 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
 
       const result = await response.json()
 
-      // 에러가 있는 경우 표시
-      if (result.error) {
+      // 문제 5 해결: 에러가 있어도 부분 데이터는 사용 가능하도록 처리
+      const hasError = !!result.error
+      if (hasError) {
         console.error("RFP 파싱 에러:", result.error)
-        toast({
-          title: "RFP 파싱 중 에러 발생",
-          description: `${result.error.type || "에러"}: ${result.error.message || "알 수 없는 에러"}`,
-          variant: "destructive",
-        })
       }
 
-      // 백엔드 응답 형식: { success: true, data: {...}, menu_recommendations: {...} }
+      // 백엔드 응답 형식: { success: true, data: {...}, menu_recommendations: {...}, error?: {...} }
       const extractedData = {
         ...(result.data || result),
-        menu_recommendations: result.menu_recommendations, // 메뉴 추천도 함께 전달
+        menu_recommendations: result.menu_recommendations,
+        _hasError: hasError,  // 에러 플래그 추가
+        _errorInfo: result.error || null,  // 에러 정보 추가
       }
       
-      // 추출된 데이터 전달
+      // 추출된 데이터 전달 (에러가 있어도 부분 데이터 사용)
       onExtractedData?.(extractedData)
 
-      if (!result.error) {
+      // 사용자에게 결과 알림
+      if (!hasError) {
         toast({
           title: "파일 업로드 완료",
           description: "RFP에서 정보를 추출했습니다.",
+        })
+      } else {
+        // 에러가 있지만 부분 데이터는 사용 가능
+        toast({
+          title: "부분 추출 완료",
+          description: `일부 정보를 추출했습니다.\n에러: ${result.error.message || "알 수 없는 에러"}\n\n누락된 내용은 직접 입력해 주세요.`,
+          variant: "destructive",
         })
       }
 

@@ -181,8 +181,8 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
       
       // 고정 항목이고 기본 항목인 경우 삭제 불가
       if (menuItem?.isFixed && index < menuItem.defaultItems.length) {
-        return
-      }
+      return
+    }
 
       const newItems = currentItems.filter((_: string, i: number) => i !== index)
       setFormData({
@@ -313,14 +313,14 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
                         className="flex-1 text-xs"
                       />
                       {!isFixed && (
-                        <Button
-                          variant="ghost"
+              <Button
+                variant="ghost"
                           size="icon"
                           onClick={() => handleRemoveItem(menu.id, itemIdx)}
                           className="flex-shrink-0 text-destructive hover:text-destructive h-8 w-8"
                         >
                           <X className="w-3 h-3" />
-                        </Button>
+              </Button>
                       )}
                     </div>
                   )

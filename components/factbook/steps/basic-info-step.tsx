@@ -50,12 +50,15 @@ export function BasicInfoStep({ method, setMethod, formData, setFormData }: Basi
                   ...formData,
                   companyName: data.company_name || formData.companyName,
                   productName: data.product_name || formData.productName,
+                  category: data.category || formData.category,  // 카테고리 자동 설정
                   // 배열이 비어있지 않으면 사용, 비어있으면 기존 값 유지
                   proposals: data.proposals && data.proposals.length > 0 ? data.proposals : formData.proposals,
                   competitors: data.competitors && data.competitors.length > 0 ? data.competitors : formData.competitors,
                   targetUsers: data.target_users && data.target_users.length > 0 ? data.target_users : formData.targetUsers,
-                  // 메뉴 항목 추천도 함께 저장
-                  menuItems: data.menu_recommendations || formData.menuItems,
+                  // 문제 3 해결: 메뉴 항목 추천을 기존 값과 병합
+                  menuItems: data.menu_recommendations 
+                    ? { ...formData.menuItems, ...data.menu_recommendations }
+                    : formData.menuItems,
                   // 매체 소재 분석 요구사항이 있으면 On으로 설정
                   analysisItems: {
                     ...formData.analysisItems,
