@@ -80,7 +80,7 @@ export function FactbookList() {
       if (sortBy === "recent") {
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       } else if (sortBy === "popular") {
-        return b.viewCount - a.viewCount
+        return (b.viewCount || 0) - (a.viewCount || 0)
       } else {
         return a.companyName.localeCompare(b.companyName)
       }
