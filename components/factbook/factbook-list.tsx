@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,20 +30,22 @@ export function FactbookList() {
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchFactbooks = async () => {
-      setLoading(true)
+  const fetchFactbooks = useCallback(
+    async (options: { showLoading?: boolean; silent?: boolean } = {}) => {
+      const { showLoading = false, silent = false } = options
+      if (showLoading) {
+        setLoading(true)
+      }
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
         const response = await fetch(`${backendUrl}/api/factbooks`)
-        
+
         if (!response.ok) {
           throw new Error("팩트북 목록 조회 실패")
         }
-        
+
         const data = await response.json()
-        
-        // 백엔드 응답 형식을 프론트엔드 형식으로 변환
+
         const factbooks: Factbook[] = (data.items || []).map((item: any) => ({
           id: String(item.id),
           companyName: item.company_name || "",
@@ -52,23 +54,48 @@ export function FactbookList() {
           status: item.status || "draft",
           createdAt: item.created_at ? new Date(item.created_at).toLocaleDateString("ko-KR") : "",
           updatedAt: item.updated_at ? new Date(item.updated_at).toLocaleDateString("ko-KR") : "",
-          viewCount: 0, // 백엔드에 viewCount가 없으므로 0으로 설정
+          viewCount: 0,
         }))
-        
+
         setFactbooks(factbooks)
       } catch (error) {
         console.error("팩트북 목록 조회 실패:", error)
-        toast({
-          title: "팩트북 목록을 불러오는데 실패했습니다.",
-          variant: "destructive",
-        })
+        if (!silent) {
+          toast({
+            title: "팩트북 목록을 불러오는데 실패했습니다.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setLoading(false)
+        if (showLoading) {
+          setLoading(false)
+        }
       }
+    },
+    [toast],
+  )
+
+  useEffect(() => {
+    fetchFactbooks({ showLoading: true })
+  }, [fetchFactbooks])
+
+  useEffect(() => {
+    if (!factbooks.length) {
+      return
     }
-    
-    fetchFactbooks()
-  }, [toast])
+    const hasPending = factbooks.some((fb) => fb.status === "generating" || fb.status === "draft")
+    if (!hasPending) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      fetchFactbooks({ silent: true })
+    }, 5000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [factbooks, fetchFactbooks])
 
   const filteredFactbooks = factbooks
     .filter(
@@ -129,7 +156,7 @@ export function FactbookList() {
   }
 
   if (loading) {
-    return <div className="text-center py-12 text-muted-foreground">팩트북이 없습니다</div>
+    return <div className="text-center py-12 text-muted-foreground">팩트북을 불러오는 중입니다...</div>
   }
 
   return (
@@ -242,22 +269,20 @@ export function FactbookList() {
                   </span>
                 </div>
 
-                {factbook.status === "generating" ? (
-                  <div className="text-sm text-muted-foreground flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    생성 중...
-                  </div>
-                ) : factbook.status === "failed" ? (
+                {factbook.status === "failed" ? (
                   <div className="text-sm text-destructive">생성 실패</div>
-                ) : factbook.status === "draft" ? (
-                  <div className="text-sm text-muted-foreground">초안</div>
-                ) : (
+                ) : factbook.status === "completed" ? (
                   <Link href={`/factbook/${factbook.id}`} className="block">
                     <Button className="w-full gap-2 bg-transparent" variant="outline">
                       <Eye className="w-4 h-4" />
                       팩트북 보기
                     </Button>
                   </Link>
+                ) : (
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    {factbook.status === "draft" ? "생성 준비 중..." : "생성 중..."}
+                  </div>
                 )}
 
                 <div className="text-xs text-muted-foreground space-y-1">
@@ -284,22 +309,20 @@ export function FactbookList() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {factbook.status === "generating" ? (
-                    <div className="text-sm text-muted-foreground flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                      생성 중...
-                    </div>
-                  ) : factbook.status === "failed" ? (
+                  {factbook.status === "failed" ? (
                     <div className="text-sm text-destructive">생성 실패</div>
-                  ) : factbook.status === "draft" ? (
-                    <div className="text-sm text-muted-foreground">초안</div>
-                  ) : (
+                  ) : factbook.status === "completed" ? (
                     <Link href={`/factbook/${factbook.id}`}>
                       <Button size="sm" variant="outline" className="gap-1 bg-transparent">
                         <Eye className="w-4 h-4" />
                         보기
                       </Button>
                     </Link>
+                  ) : (
+                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      {factbook.status === "draft" ? "생성 준비 중..." : "생성 중..."}
+                    </div>
                   )}
 
                   <DropdownMenu>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -139,6 +140,25 @@ const MENU_ITEMS: MenuItem[] = [
 ]
 
 export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
+  // 컴포넌트 마운트 시 company 섹션이 없으면 기본값으로 초기화
+  useEffect(() => {
+    if (!setFormData) return
+    
+    // company 섹션이 없거나 비어있으면 기본값으로 초기화
+    if (!formData.menuItems?.company || formData.menuItems.company.length === 0) {
+      const companyMenu = MENU_ITEMS.find((m) => m.id === "company")
+      if (companyMenu) {
+        setFormData({
+          ...formData,
+          menuItems: {
+            ...formData.menuItems,
+            company: [...companyMenu.defaultItems],
+          },
+        })
+      }
+    }
+  }, []) // 마운트 시 한 번만 실행
+  
   const getMenuItems = (menuId: string): string[] => {
     return formData.menuItems?.[menuId] || MENU_ITEMS.find((m) => m.id === menuId)?.defaultItems || []
   }

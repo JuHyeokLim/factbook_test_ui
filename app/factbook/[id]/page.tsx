@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, ReactNode } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowUp } from "lucide-react"
@@ -9,8 +9,9 @@ import { useToast } from "@/hooks/use-toast"
 import { MediaTab } from "@/components/factbook/media-tab"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { ImageViewer } from "@/components/factbook/image-viewer"
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { AreaChart, BarChart, Card, DonutChart, LineChart, Text, Title } from "@tremor/react"
 
 interface Source {
   title: string
@@ -20,10 +21,22 @@ interface Source {
   imageUrl?: string
 }
 
+interface VisualizationItem {
+  id: string
+  component: "BarChart" | "LineChart" | "DonutChart" | "AreaChart"
+  title?: string
+  data?: Record<string, any>[]
+  index?: string
+  categories?: string[]
+  category?: string; // 추가: 백엔드가 단일 카테고리(라벨) 키를 줄 경우 대비
+  value?: string;    // 추가: 백엔드가 단일 값 키를 줄 경우 대비
+}
+
 interface SubSection {
   id: string
   title: string
   content: string
+  visualizations?: VisualizationItem[]
   sources?: Source[] // subSection 레벨에 sources 추가
 }
 
@@ -42,11 +55,362 @@ interface FactbookDetail {
   sections: Section[]
 }
 
+// [[VISUALIZATION_DATA]] 블록만 잡고 뒤쪽 </answer> 등은 제외
+const visualizationBlockRegex = /\[\[VISUALIZATION_DATA\]\]\s*([\s\S]*?)(?:<\/answer>|$)/i
+// <think>, <reasoning> 등 다양한 변형 태그 제거
+const redactedReasoningRegex = /<(?:redacted_)?(?:reasoning|think)>[\s\S]*?<\/(?:redacted_)?(?:reasoning|think)>/gi
+// <answer> ... </answer> 블록만 출력 대상으로 사용
+const answerBlockRegex = /<answer>([\s\S]*?)<\/answer>/gi
+
+// [수정] parseVisualizations 함수 전체 교체
+const parseVisualizations = (
+  rawContent: string
+): { cleanedContent: string; visualizations: VisualizationItem[] } => {
+  // 1) reasoning/think 제거
+  let cleanedContent = rawContent.replace(redactedReasoningRegex, "")
+
+  // 2) answer 블록만 추출
+  const answerMatches = [...cleanedContent.matchAll(answerBlockRegex)]
+  if (answerMatches.length > 0) {
+    cleanedContent = answerMatches.map((m) => m[1]).join("\n\n")
+  }
+  cleanedContent = cleanedContent.trim()
+  
+  const match = cleanedContent.match(visualizationBlockRegex)
+  let visualizations: VisualizationItem[] = []
+
+  if (match && match[1]) {
+    // [중요] 마크다운 코드 블록(```json 등) 제거 로직 추가
+    let jsonText = match[1].trim()
+    jsonText = jsonText
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/, "")
+
+    console.log("parseVisualizations: 추출된 JSON 텍스트:", jsonText)
+    try {
+      const parsed = JSON.parse(jsonText)
+      // 배열인지 혹은 객체 내부의 visualizations 배열인지 확인
+      const extracted = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray((parsed as any)?.visualizations)
+        ? (parsed as any).visualizations
+        : []
+
+      if (Array.isArray(extracted)) {
+        visualizations = extracted
+          .filter((item) => item && typeof item.id === "string")
+          .map((item) => ({
+            ...item,
+            component: item.component,
+          }))
+        console.log("parseVisualizations: 파싱된 시각화 데이터:", visualizations)
+      }
+    } catch (error) {
+      console.warn("시각화 JSON 파싱 실패:", error)
+    }
+  }
+
+  cleanedContent = cleanedContent.replace(visualizationBlockRegex, "").trim()
+  return { cleanedContent, visualizations }
+}
+
+const numberFormatter = (value: any) => {
+  if (value === null || value === undefined) return ""
+  if (typeof value === "number") return value.toLocaleString("ko-KR")
+  return String(value)
+}
+
+const sanitizeVisualizationData = (
+  viz: VisualizationItem, 
+  indexKey: string, 
+  categoryKeys: string[]
+): { data: Record<string, any>[]; error?: string; invalidRows?: any[] } => {
+  // data가 없으면 빈 배열로 초기화
+  const { data = [] } = viz
+
+  if (!data || !data.length) return { error: "데이터가 없습니다.", data: [] }
+  if (!indexKey) return { error: "index(라벨) 키를 찾을 수 없습니다.", data: [] }
+  if (!categoryKeys || !categoryKeys.length) return { error: "categories(수치) 키를 찾을 수 없습니다.", data: [] }
+
+  const sanitizeNumber = (val: any) => {
+    if (typeof val === "number") return val
+    if (typeof val === "string") {
+      const cleaned = val.replace(/,/g, "").replace(/%/g, "").replace(/[^\d.\-+eE]/g, "")
+      if (cleaned.trim() === "") return NaN
+      const num = Number(cleaned)
+      return Number.isNaN(num) ? NaN : num
+    }
+    return NaN
+  }
+
+  const invalidRows: { row: any; reason: string }[] = []
+
+  const sanitized = data
+    .map((row) => {
+      // indexKey(라벨) 확인
+      if (!(indexKey in row)) {
+        invalidRows.push({ row, reason: `index 키 '${indexKey}' 누락` })
+        return null
+      }
+      
+      const next = { ...row }
+      let valid = true
+      
+      // categoryKeys(수치) 확인 및 변환
+      categoryKeys.forEach((cat) => {
+        if (!(cat in next)) {
+          valid = false
+          invalidRows.push({ row, reason: `category 키 '${cat}' 누락` })
+          return
+        }
+        const num = sanitizeNumber(next[cat])
+        if (Number.isNaN(num)) {
+          valid = false
+          invalidRows.push({ row, reason: `category '${cat}' 숫자 아님` })
+        } else {
+          next[cat] = num
+        }
+      })
+      return valid ? next : null
+    })
+    .filter(Boolean) as Record<string, any>[]
+
+  if (!sanitized.length) {
+    return { error: "유효한 데이터 행이 없습니다.", data: [], invalidRows }
+  }
+
+  return { data: sanitized, invalidRows }
+}
+
+// [수정] renderChartComponent 함수: 키 매핑 로직 추가
+const renderChartComponent = (viz: VisualizationItem) => {
+  if (!viz) return null
+
+  const { id, component, title, data = [], index, categories = [], category, value } = viz
+  const chartTitle = title || id
+
+  // 1. 라벨(X축/항목명) 키 결정
+  const chartIndex = index || category || "category"
+
+  // 2. 수치(Y축/값) 키 결정
+  const chartCategories = (categories && categories.length > 0) 
+    ? categories 
+    : [value || "value"]
+
+  // 3. 데이터 정제
+  const { data: sanitizedData, error: validationError } = sanitizeVisualizationData(
+    viz, 
+    chartIndex, 
+    chartCategories
+  )
+
+  const renderFallback = (message: string) => (
+    <Card className="border-slate-200 shadow-none">
+      <Text className="text-xs text-slate-500">{message}</Text>
+    </Card>
+  )
+
+  if (!data || data.length === 0) {
+    return renderFallback("시각화 데이터가 없어 차트를 표시할 수 없습니다.")
+  }
+
+  if (validationError) {
+    return renderFallback(`시각화 데이터 오류: ${validationError}`)
+  }
+
+  // [수정] 타입스크립트 에러 방지: sanitizedData가 undefined일 경우 빈 배열 할당
+  const finalData = sanitizedData || []
+
+  // Tremor v3 DonutChart
+  if (component === "DonutChart") {
+    const measureKey = chartCategories[0]
+    
+    return (
+      <Card className="border-slate-200 shadow-none">
+        <Title className="text-base font-semibold text-slate-900 mb-3">{chartTitle}</Title>
+        <DonutChart
+          data={finalData}
+          category={measureKey}
+          index={chartIndex}
+          valueFormatter={numberFormatter}
+          className="mt-2 h-40"
+        />
+      </Card>
+    )
+  }
+
+  // Bar, Line, Area Chart
+  const commonProps = {
+    data: finalData,
+    index: chartIndex,
+    categories: chartCategories,
+    valueFormatter: numberFormatter,
+    className: "mt-2 h-72",
+  }
+
+  switch (component) {
+    case "BarChart":
+      return (
+        <Card className="border-slate-200 shadow-none">
+          <Title className="text-base font-semibold text-slate-900 mb-3">{chartTitle}</Title>
+          <BarChart {...commonProps} />
+        </Card>
+      )
+    case "LineChart":
+      return (
+        <Card className="border-slate-200 shadow-none">
+          <Title className="text-base font-semibold text-slate-900 mb-3">{chartTitle}</Title>
+          <LineChart {...commonProps} />
+        </Card>
+      )
+    case "AreaChart":
+      return (
+        <Card className="border-slate-200 shadow-none">
+          <Title className="text-base font-semibold text-slate-900 mb-3">{chartTitle}</Title>
+          <AreaChart {...commonProps} />
+        </Card>
+      )
+    default:
+      return renderFallback(`${component} 타입 차트가 지원되지 않습니다.`)
+  }
+}
+
+const markdownComponents: Components = {
+  h1: ({ children, ...props }: any) => (
+    <h1 {...props} className="text-2xl font-bold text-slate-900 mt-6 mb-4">
+      {children}
+    </h1>
+  ),
+  h2: ({ children, ...props }: any) => (
+    <h2 {...props} className="text-xl font-bold text-slate-900 mt-5 mb-3">
+      {children}
+    </h2>
+  ),
+  h3: ({ children, ...props }: any) => (
+    <h3 {...props} className="text-lg font-semibold text-slate-900 mt-4 mb-2">
+      {children}
+    </h3>
+  ),
+  h4: ({ children, ...props }: any) => (
+    <h4 {...props} className="text-base font-semibold text-slate-900 mt-3 mb-2">
+      {children}
+    </h4>
+  ),
+  p: ({ children, ...props }: any) => (
+    <p {...props} className="mb-4 leading-relaxed">
+      {children}
+    </p>
+  ),
+  ul: ({ children, ...props }: any) => (
+    <ul {...props} className="list-disc list-outside mb-4 space-y-2 ml-6 pl-2">
+      {children}
+    </ul>
+  ),
+  ol: ({ children, ...props }: any) => (
+    <ol {...props} className="list-decimal list-outside mb-4 space-y-2 ml-6 pl-2">
+      {children}
+    </ol>
+  ),
+  li: ({ children, ...props }: any) => (
+    <li {...props} className="mb-2 leading-relaxed">
+      {children}
+    </li>
+  ),
+  strong: ({ children, ...props }: any) => (
+    <strong {...props} className="font-semibold text-slate-900">
+      {children}
+    </strong>
+  ),
+  em: ({ children, ...props }: any) => (
+    <em {...props} className="italic">
+      {children}
+    </em>
+  ),
+  code: ({ children, className, ...props }: any) => {
+    const isInline = !className
+    return isInline ? (
+      <code {...props} className="bg-slate-100 text-slate-900 px-1.5 py-0.5 rounded text-xs font-mono">
+        {children}
+      </code>
+    ) : (
+      <code {...props} className={className}>
+        {children}
+      </code>
+    )
+  },
+  pre: ({ children, ...props }: any) => (
+    <pre {...props} className="bg-slate-100 border border-slate-300 rounded p-4 overflow-x-auto mb-4">
+      {children}
+    </pre>
+  ),
+  blockquote: ({ children, ...props }: any) => (
+    <blockquote
+      {...props}
+      className="border-l-4 border-slate-300 pl-4 italic my-4 text-slate-600"
+    >
+      {children}
+    </blockquote>
+  ),
+  a: ({ href, children, className, ...props }: any) => {
+    const childrenStr = String(children)
+    const citationMatch = childrenStr.match(/^CITATION_MARKER_(\d+)$/)
+    const isCitation = !!citationMatch
+    const displayText = isCitation ? `[${citationMatch![1]}]` : children
+
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={
+          isCitation
+            ? "text-blue-600 hover:text-blue-800 cursor-pointer"
+            : "text-blue-600 underline hover:text-blue-800"
+        }
+        {...props}
+      >
+        {displayText}
+      </a>
+    )
+  },
+  table: ({ children, ...props }: any) => (
+    <div className="overflow-x-auto mb-4 my-6">
+      <table {...props} className="w-full border border-slate-300">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children, ...props }: any) => (
+    <thead {...props} className="bg-slate-100">
+      {children}
+    </thead>
+  ),
+  tbody: ({ children, ...props }: any) => <tbody {...props}>{children}</tbody>,
+  tr: ({ children, ...props }: any) => (
+    <tr {...props} className="border-b border-slate-200">
+      {children}
+    </tr>
+  ),
+  th: ({ children, ...props }: any) => (
+    <th {...props} className="border border-slate-300 px-6 py-3 text-left font-semibold text-slate-900">
+      {children}
+    </th>
+  ),
+  td: ({ children, ...props }: any) => (
+    <td {...props} className="border border-slate-300 px-6 py-3">
+      {children}
+    </td>
+  ),
+  hr: () => <hr className="my-6 border-slate-300" />,
+}
+
 export default function FactbookDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [factbook, setFactbook] = useState<FactbookDetail | null>(null)
-  const [activeSection, setActiveSection] = useState<string>("1-1")
+  const [activeSection, setActiveSection] = useState<string>("")
+  const [expandedSection, setExpandedSection] = useState<string | undefined>(undefined) // Accordion에서 열린 섹션
   const [activeTab, setActiveTab] = useState<"factbook" | "media">("factbook")
   const [sourceTab, setSourceTab] = useState<"source" | "image">("source") // 출처/이미지 탭
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -82,11 +446,17 @@ export default function FactbookDetailPage() {
           productName: data.product_name || "",
           category: data.category || "",
           sections: (data.sections || []).map((section: any) => {
-            // subSection 레벨에 sources 유지
-            const subSectionsWithSources = (section.subSections || []).map((subSection: any) => ({
+            // 백엔드 데이터 키값 확인 (sub_sections 우선 체크)
+            const rawSubSections = section.subSections || section.sub_sections || [];
+  
+            const subSectionsWithSources = rawSubSections.map((subSection: any) => {
+              const { cleanedContent, visualizations } = parseVisualizations(subSection.content || "")
+              const rawSources = subSection.sources || subSection.source_list || [];
+              return {
               id: subSection.id || "",
               title: subSection.title || "",
-              content: subSection.content || "",
+                content: cleanedContent,
+                visualizations,
               sources: (subSection.sources || []).map((source: any) => ({
                 title: source.title || "",
                 content: source.content || "",
@@ -94,7 +464,8 @@ export default function FactbookDetailPage() {
                 url: source.url || "",
                 imageUrl: source.imageUrl || undefined,
               })),
-            }))
+              }
+            })
 
             // section 레벨의 sources는 모든 subSection의 sources를 flatMap (계산용)
             const allSources: Source[] = subSectionsWithSources.flatMap(
@@ -114,7 +485,9 @@ export default function FactbookDetailPage() {
         
         // 첫 번째 섹션을 기본 활성화
         if (factbook.sections.length > 0 && factbook.sections[0].subSections.length > 0) {
-          setActiveSection(factbook.sections[0].subSections[0].id)
+          const firstSubSectionId = factbook.sections[0].subSections[0].id
+          setActiveSection(firstSubSectionId)
+          setExpandedSection(factbook.sections[0].id) // 첫 번째 섹션 열기
         }
       } catch (error) {
         console.error("팩트북 조회 실패:", error)
@@ -138,6 +511,19 @@ export default function FactbookDetailPage() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  // activeSection이 변경될 때 해당 섹션이 자동으로 열리도록
+  useEffect(() => {
+    if (!factbook) return
+    
+    const currentSection = factbook.sections.find((s) => 
+      s.subSections.some((ss) => ss.id === activeSection)
+    )
+    
+    if (currentSection) {
+      setExpandedSection(currentSection.id)
+    }
+  }, [activeSection, factbook])
 
   // Intersection Observer로 현재 보이는 섹션 감지
   useEffect(() => {
@@ -273,6 +659,102 @@ export default function FactbookDetailPage() {
 
   const handleScrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  // 본문의 [숫자] 패턴을 출처 URL 링크로 변환 (마크다운 링크 형식)
+  const convertCitationLinks = (content: string, sources: Source[] = []): string => {
+    if (!sources || sources.length === 0) {
+      return content
+    }
+
+    // [숫자] 패턴을 찾아서 마크다운 링크로 변환
+    // 링크 텍스트에 [1]을 표시하기 위해 특수 마커 사용
+    // 예: [1] -> [CITATION_MARKER_1](url1)
+    return content.replace(/\[(\d+)\]/g, (match, numStr) => {
+      const index = parseInt(numStr, 10) - 1 // 1-based to 0-based
+      if (index >= 0 && index < sources.length && sources[index]?.url) {
+        const url = sources[index].url!
+        // 특수 마커를 사용하여 나중에 컴포넌트에서 [1]로 변환
+        return `[CITATION_MARKER_${numStr}](${url})`
+      }
+      // URL이 없으면 원본 유지
+      return match
+    })
+  }
+
+  const renderContentWithCharts = (subSection: SubSection) => {
+    const content = subSection.content || ""
+    const visualizations = subSection.visualizations || []
+    const sources = subSection.sources || []
+    const regex = /\{\{([A-Z0-9_]+)\}\}/g
+    const nodes: ReactNode[] = []
+    const usedChartIds = new Set<string>()
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+
+    while ((match = regex.exec(content)) !== null) {
+      const textSegment = content.slice(lastIndex, match.index)
+      if (textSegment.trim()) {
+        nodes.push(
+          <ReactMarkdown
+            key={`md-${subSection.id}-${match.index}`}
+            remarkPlugins={[remarkGfm]}
+            components={markdownComponents}
+          >
+            {convertCitationLinks(textSegment, sources)}
+          </ReactMarkdown>
+        )
+      }
+
+      const chartId = match[1]
+      const viz = visualizations.find((v) => v.id === chartId)
+      if (viz) {
+        usedChartIds.add(chartId)
+      }
+      nodes.push(
+        <div key={`chart-${subSection.id}-${chartId}-${match.index}`} className="my-4">
+          {viz ? (
+            <>
+              {console.log("renderContentWithCharts: renderChartComponent 호출, viz:", viz)}
+              {renderChartComponent(viz)}
+            </>
+          ) : (
+            <div className="text-xs text-slate-500 italic border border-dashed border-slate-300 rounded p-3">
+              {`시각화 데이터(${chartId})를 찾을 수 없습니다.`}
+            </div>
+          )}
+        </div>
+      )
+
+      lastIndex = regex.lastIndex
+    }
+
+    const remaining = content.slice(lastIndex)
+    if (remaining.trim() || nodes.length === 0) {
+      nodes.push(
+        <ReactMarkdown
+          key={`md-${subSection.id}-last`}
+          remarkPlugins={[remarkGfm]}
+          components={markdownComponents}
+        >
+          {convertCitationLinks(remaining, sources)}
+        </ReactMarkdown>
+      )
+    }
+
+    // 만약 본문에 {{CHART_ID}}를 넣지 않아도, 응답 JSON에 있는 차트를 모두 노출
+    const unusedVisualizations = visualizations.filter((viz) => !usedChartIds.has(viz.id))
+    if (unusedVisualizations.length > 0) {
+      unusedVisualizations.forEach((viz) => {
+        nodes.push(
+          <div key={`chart-${subSection.id}-${viz.id}-fallback`} className="my-4">
+            {renderChartComponent(viz)}
+          </div>
+        )
+      })
+    }
+
+    return <div className="space-y-4">{nodes}</div>
   }
 
   const handleSubSectionClick = (subSectionId: string) => {
@@ -429,9 +911,8 @@ export default function FactbookDetailPage() {
               type="single" 
               collapsible 
               className="w-full"
-              value={factbook.sections.find((s) => 
-                s.subSections.some((ss) => ss.id === activeSection)
-              )?.id || factbook.sections[0]?.id}
+              value={expandedSection}
+              onValueChange={setExpandedSection}
             >
               {factbook.sections.map((section, idx) => {
                 const hasActiveSubSection = section.subSections.some((ss) => ss.id === activeSection)
@@ -484,67 +965,7 @@ export default function FactbookDetailPage() {
                         <h3 className="text-lg font-semibold text-slate-900 mb-4">{subSection.title}</h3>
                         <div className="space-y-4">
                           <div className="text-slate-700 text-sm leading-relaxed markdown-content">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                h1: ({ children }) => <h1 className="text-2xl font-bold text-slate-900 mt-6 mb-4">{children}</h1>,
-                                h2: ({ children }) => <h2 className="text-xl font-bold text-slate-900 mt-5 mb-3">{children}</h2>,
-                                h3: ({ children }) => <h3 className="text-lg font-semibold text-slate-900 mt-4 mb-2">{children}</h3>,
-                                h4: ({ children }) => <h4 className="text-base font-semibold text-slate-900 mt-3 mb-2">{children}</h4>,
-                                p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
-                                ul: ({ children }) => <ul className="list-disc list-outside mb-4 space-y-2 ml-6 pl-2">{children}</ul>,
-                                ol: ({ children }) => <ol className="list-decimal list-outside mb-4 space-y-2 ml-6 pl-2">{children}</ol>,
-                                li: ({ children }) => <li className="mb-2 leading-relaxed">{children}</li>,
-                                strong: ({ children }) => <strong className="font-semibold text-slate-900">{children}</strong>,
-                                em: ({ children }) => <em className="italic">{children}</em>,
-                                code: ({ children, className }) => {
-                                  const isInline = !className
-                                  return isInline ? (
-                                    <code className="bg-slate-100 text-slate-900 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
-                                  ) : (
-                                    <code className={className}>{children}</code>
-                                  )
-                                },
-                                pre: ({ children }) => (
-                                  <pre className="bg-slate-100 border border-slate-300 rounded p-4 overflow-x-auto mb-4">
-                                    {children}
-                                  </pre>
-                                ),
-                                blockquote: ({ children }) => (
-                                  <blockquote className="border-l-4 border-slate-300 pl-4 italic my-4 text-slate-600">
-                                    {children}
-                                  </blockquote>
-                                ),
-                                a: ({ href, children }) => (
-                                  <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">
-                                    {children}
-                                  </a>
-                                ),
-                                table: ({ children }) => (
-                                  <div className="overflow-x-auto mb-4 my-6">
-                                    <table className="w-full border border-slate-300">
-                                      {children}
-                                    </table>
-                          </div>
-                                ),
-                                thead: ({ children }) => <thead className="bg-slate-100">{children}</thead>,
-                                tbody: ({ children }) => <tbody>{children}</tbody>,
-                                tr: ({ children }) => <tr className="border-b border-slate-200">{children}</tr>,
-                                th: ({ children }) => (
-                                  <th className="border border-slate-300 px-6 py-3 text-left font-semibold text-slate-900">
-                                    {children}
-                                  </th>
-                                ),
-                                td: ({ children }) => (
-                                  <td className="border border-slate-300 px-6 py-3">
-                                    {children}
-                                  </td>
-                                ),
-                                hr: () => <hr className="my-6 border-slate-300" />,
-                              }}
-                            >
-                              {subSection.content || ""}
-                            </ReactMarkdown>
+                            {renderContentWithCharts(subSection)}
                           </div>
                         </div>
                       </section>

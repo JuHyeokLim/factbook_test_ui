@@ -6,6 +6,36 @@ import { BasicInfoStep } from "./steps/basic-info-step"
 import { DetailedInfoStep } from "./steps/detailed-info-step"
 import { MenuConfigStep } from "./steps/menu-config-step"
 
+const DEFAULT_MENU_ITEMS: Record<string, string[]> = {
+  company: [
+    "기본 정보 (회사 로고, 회사 이름, 대표자, 주소, 홈페이지, 업종, 설립일)",
+    "철학 및 비전 (비전과 목표, CEO 메시지, 브랜드 보이스)",
+    "역사 (설립 배경, 주요 연혁)",
+    "주요 사업 (사업 분야, 상품/서비스, 수익모델)",
+    "재무 정보 (최근 3년 매출, 영업이익, 투자 및 비용 구조)",
+  ],
+  market: [
+    "방송통신 산업 현황 및 트렌드",
+    "지역별 방송/통신 시장 규모 및 성장 전망",
+    "규제 환경 및 정책 동향",
+  ],
+  ownCompany: [
+    "가입자 수, 시장 점유율 및 서비스별 실적",
+    "주요 서비스(헬로TV, 헬로넷, 헬로전화, 헬로모바일) 현황",
+  ],
+  competitor: [
+    "주요 경쟁사 비교 (시장 점유율, 서비스 범위, 요금제 등)",
+    "경쟁사의 강점 및 약점",
+  ],
+  target: [
+    "주요 고객 세그먼트 및 특성",
+    "고객 니즈 및 선호도 분석",
+  ],
+}
+
+const getDefaultMenuItems = () =>
+  Object.fromEntries(Object.entries(DEFAULT_MENU_ITEMS).map(([key, items]) => [key, [...items]]))
+
 interface CreateFactbookModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -26,7 +56,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
     analysisItems: {
       media: false,
     },
-    menuItems: {},
+    menuItems: getDefaultMenuItems(),
     companyInfoItems: {
       basic: true, // 고정
       philosophy: true, // 고정
@@ -66,10 +96,27 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
       const cleanedCompetitors = formData.competitors.filter((c: string) => c.trim())
       const cleanedTargetUsers = formData.targetUsers.filter((t: string) => t.trim())
       
-      // 메뉴 항목 정리 (빈 문자열 제거)
+      // 메뉴 항목 정리 (빈 문자열 제거 + 기업 정보 토글 필터링)
       const cleanedMenuItems: Record<string, string[]> = {}
-      Object.entries(formData.menuItems).forEach(([key, items]) => {
-        cleanedMenuItems[key] = (items as string[]).filter(item => item.trim())
+      
+      // company 섹션은 항상 보장 (다른 섹션보다 먼저 처리)
+      const companyItems = formData.menuItems?.company || DEFAULT_MENU_ITEMS.company
+      const companyInfoState = formData.companyInfoItems || {}
+      cleanedMenuItems.company = companyItems
+        .filter((_, idx) => {
+          if (idx < 3) return true // 기본 3개는 항상 포함
+          if (idx === 3) return !!companyInfoState.business
+          if (idx === 4) return !!companyInfoState.finance
+          return true
+        })
+        .map(item => item.trim())
+        .filter(Boolean)
+      
+      // 나머지 섹션 처리
+      Object.entries(formData.menuItems || {}).forEach(([key, items]) => {
+        if (key !== "company") { // company는 이미 처리했으므로 제외
+          cleanedMenuItems[key] = (items as string[]).map(item => item.trim()).filter(Boolean)
+        }
       })
       
       const requestBody = {
@@ -84,6 +131,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
       }
       
       console.log("팩트북 생성 요청:", requestBody)
+      console.log("company 섹션:", cleanedMenuItems.company)
       
       // 백엔드 API 호출
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
@@ -118,7 +166,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
         analysisItems: {
           media: false,
         },
-        menuItems: {},
+        menuItems: getDefaultMenuItems(),
         companyInfoItems: {
           basic: true,
           philosophy: true,
