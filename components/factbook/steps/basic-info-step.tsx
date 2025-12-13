@@ -65,16 +65,11 @@ export function BasicInfoStep({ method, setMethod, formData, setFormData }: Basi
                     media: data.requires_media_analysis ?? formData.analysisItems?.media ?? false,
                   },
                 })
+                // RFP 업로드 완료 시 직접 입력 탭으로 이동
+                setMethod("manual")
               }
             }}
           />
-          <div className="text-xs text-center text-muted-foreground">
-            RFP를 여기에 끌어다놓거나
-            <br />
-            파일 선택 버튼을 눌러주세요.
-            <br />
-            (10MB 이하의 pdf, pptx, docx)
-          </div>
         </div>
       )}
 
@@ -99,16 +94,6 @@ export function BasicInfoStep({ method, setMethod, formData, setFormData }: Basi
               onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
               className="h-11"
             />
-          </div>
-
-          <div className="pt-2">
-            <Button 
-              variant="link" 
-              className="text-sm text-primary p-0 h-auto"
-              onClick={() => setMethod("upload")}
-            >
-              RFP 파일로하기
-            </Button>
           </div>
         </div>
       )}

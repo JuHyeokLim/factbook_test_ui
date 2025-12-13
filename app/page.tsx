@@ -22,7 +22,6 @@ export default function Home() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">팩트북 생성 AI Agent</h1>
-            <p className="text-muted-foreground">기업명으로 팩트북을 검색하세요</p>
           </div>
           <Button onClick={() => setIsModalOpen(true)} size="lg" className="gap-2">
             <Plus className="w-5 h-5" />

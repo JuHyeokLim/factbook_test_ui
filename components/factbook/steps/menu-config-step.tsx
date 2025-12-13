@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Plus, X } from "lucide-react"
 
 interface MenuConfigStepProps {
@@ -72,7 +72,7 @@ const COMPANY_INFO_ITEMS: CompanyInfoItem[] = [
       "주요 상품/서비스",
       "수익모델",
     ],
-    isFixed: false,
+    isFixed: true,
   },
   {
     id: "finance",
@@ -83,7 +83,7 @@ const COMPANY_INFO_ITEMS: CompanyInfoItem[] = [
       "영업이익: 영업이익 (연도별 추이)",
       "투자 및 비용 구조: 마케팅비, R&D 비중",
     ],
-    isFixed: false,
+    isFixed: true,
   },
 ]
 
@@ -163,21 +163,6 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
     return formData.menuItems?.[menuId] || MENU_ITEMS.find((m) => m.id === menuId)?.defaultItems || []
   }
 
-  const getCompanyInfoEnabled = (itemId: string): boolean => {
-    return formData.companyInfoItems?.[itemId] ?? (COMPANY_INFO_ITEMS.find((item) => item.id === itemId)?.isFixed ?? false)
-  }
-
-  const handleCompanyInfoToggle = (itemId: string, checked: boolean) => {
-    if (setFormData) {
-      setFormData({
-        ...formData,
-        companyInfoItems: {
-          ...formData.companyInfoItems,
-          [itemId]: checked,
-        },
-      })
-    }
-  }
 
   const handleAddItem = (menuId: string) => {
     if (setFormData) {
@@ -285,31 +270,18 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
                 {items.map((item: string, itemIdx: number) => {
                   const isFixed = menu.isFixed && itemIdx < menu.defaultItems.length
                   
-                  // 기업 정보의 경우, 주요 사업과 재무 정보는 토글로 처리
+                  // 기업 정보의 경우 모두 고정 (토글 없음)
                   if (isCompanyInfo) {
-                    const isBusinessItem = itemIdx === 3 // 주요 사업
-                    const isFinanceItem = itemIdx === 4 // 재무 정보
-                    const isToggleable = isBusinessItem || isFinanceItem
-                    const itemKey = isBusinessItem ? "business" : isFinanceItem ? "finance" : null
-                    const isEnabled = itemKey ? getCompanyInfoEnabled(itemKey) : true
-
                     return (
                       <div key={itemIdx} className="flex items-center gap-2">
-                        <Input
+                        <Textarea
                           placeholder="내용을 입력하세요."
                           value={item}
                           onChange={(e) => handleUpdateItem(menu.id, itemIdx, e.target.value)}
-                          disabled={isFixed || (isToggleable && !isEnabled)}
+                          disabled={isFixed}
                           className="flex-1 text-xs"
                         />
-                        {isToggleable && (
-                          <Switch
-                            checked={isEnabled}
-                            onCheckedChange={(checked) => itemKey && handleCompanyInfoToggle(itemKey, checked)}
-                            className="flex-shrink-0"
-                          />
-                        )}
-                        {!isFixed && !isToggleable && (
+                        {!isFixed && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -325,7 +297,7 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
 
                   return (
                     <div key={itemIdx} className="flex gap-2">
-                      <Input
+                      <Textarea
                         placeholder="내용을 입력하세요."
                         value={item}
                         onChange={(e) => handleUpdateItem(menu.id, itemIdx, e.target.value)}

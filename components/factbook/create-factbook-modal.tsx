@@ -58,11 +58,11 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
     },
     menuItems: getDefaultMenuItems(),
     companyInfoItems: {
-      basic: true, // 고정
-      philosophy: true, // 고정
-      history: true, // 고정
-      business: false, // On/Off 가능
-      finance: false, // On/Off 가능
+      basic: true,
+      philosophy: true,
+      history: true,
+      business: true, // 기본값으로 설정
+      finance: true, // 기본값으로 설정
     },
   })
 
@@ -87,6 +87,22 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
     }
   }
 
+  const isStepValid = (step: number): boolean => {
+    if (step === 0) {
+      // 기본 정보 입력: 기업명은 필수
+      return formData.companyName.trim() !== ""
+    }
+    if (step === 1) {
+      // 추가 정보 입력: 모두 선택 사항
+      return true
+    }
+    if (step === 2) {
+      // 메뉴 구성: 항상 유효
+      return true
+    }
+    return true
+  }
+
   const handleCreateFactbook = async () => {
     setIsSubmitting(true)
     
@@ -100,25 +116,30 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
       const cleanedMenuItems: Record<string, string[]> = {}
       
       // company 섹션은 항상 보장 (다른 섹션보다 먼저 처리)
-      const companyItems = formData.menuItems?.company || DEFAULT_MENU_ITEMS.company
-      const companyInfoState = formData.companyInfoItems || {}
-      cleanedMenuItems.company = companyItems
-        .filter((_, idx) => {
-          if (idx < 3) return true // 기본 3개는 항상 포함
-          if (idx === 3) return !!companyInfoState.business
-          if (idx === 4) return !!companyInfoState.finance
-          return true
-        })
-        .map(item => item.trim())
-        .filter(Boolean)
+      // const companyItems = formData.menuItems?.company || DEFAULT_MENU_ITEMS.company
+      // const companyInfoState = formData.companyInfoItems || {}
+      // cleanedMenuItems.company = companyItems
+      //   .filter((_, idx) => {
+      //     if (idx < 3) return true // 기본 3개는 항상 포함
+      //     if (idx === 3) return !!companyInfoState.business
+      //     if (idx === 4) return !!companyInfoState.finance
+      //     return true
+      //   })
+      //   .map(item => item.trim())
+      //   .filter(Boolean)
       
       // 나머지 섹션 처리
-      Object.entries(formData.menuItems || {}).forEach(([key, items]) => {
-        if (key !== "company") { // company는 이미 처리했으므로 제외
-          cleanedMenuItems[key] = (items as string[]).map(item => item.trim()).filter(Boolean)
-        }
-      })
+      // Object.entries(formData.menuItems || {}).forEach(([key, items]) => {
+      //   if (key !== "company") { // company는 이미 처리했으므로 제외
+      //     cleanedMenuItems[key] = (items as string[]).map(item => item.trim()).filter(Boolean)
+      //   }
+      // })
       
+      // 모든 섹션 처리
+      Object.entries(formData.menuItems || {}).forEach(([key, items]) => {
+        cleanedMenuItems[key] = (items as string[]).map(item => item.trim()).filter(Boolean)
+      })
+
       const requestBody = {
         company_name: formData.companyName,
         product_name: formData.productName || null,
@@ -171,8 +192,8 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
           basic: true,
           philosophy: true,
           history: true,
-          business: false,
-          finance: false,
+          business: true, // 기본값으로 설정
+          finance: true, // 기본값으로 설정
         },
       })
       setCurrentStep(0)
@@ -187,8 +208,8 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`${currentStep === 2 ? "!max-w-[95vw] !w-[95vw] sm:!max-w-[95vw]" : "max-w-2xl"} max-h-[90vh] overflow-y-auto p-6`}>
-        <DialogHeader>
+      <DialogContent className={`${currentStep === 2 ? "!max-w-[95vw] !w-[95vw] sm:!max-w-[95vw]" : "max-w-2xl"} max-h-[90vh] flex flex-col p-6`}>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>팩트북 만들기</DialogTitle>
           {/* Progress Indicator */}
           <div className="flex items-center gap-2 mt-4 text-sm">
@@ -209,7 +230,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
           </div>
         </DialogHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 flex-1 overflow-y-auto">
           {currentStep === 0 && (
             <BasicInfoStep
               method={method}
@@ -224,24 +245,26 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
           )}
 
           {currentStep === 2 && <MenuConfigStep formData={formData} setFormData={setFormData} />}
+        </div>
 
-          {/* Navigation */}
-          <div className="flex justify-between gap-3 pt-6 border-t border-border">
+        {/* Navigation - Fixed at bottom */}
+        <div className={`flex gap-3 pt-6 border-t border-border mt-6 flex-shrink-0 ${currentStep === 0 ? "justify-end" : "justify-between"}`}>
+          {currentStep > 0 && (
             <button
               onClick={handlePrev}
-              disabled={currentStep === 0 || isSubmitting}
+              disabled={isSubmitting}
               className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted rounded-md transition-colors"
             >
               이전
             </button>
-            <button
-              onClick={handleNext}
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-md font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? "생성 중..." : (currentStep === steps.length - 1 ? "완료" : "다음")}
-            </button>
-          </div>
+          )}
+          <button
+            onClick={handleNext}
+            disabled={isSubmitting || !isStepValid(currentStep)}
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-md font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? "생성 중..." : (currentStep === steps.length - 1 ? "완료" : "다음")}
+          </button>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { X, Plus } from "lucide-react"
 import {
   Select,
@@ -120,7 +120,7 @@ export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProp
       {/* 제목 섹션 */}
       <div>
         <h3 className="text-lg font-bold text-foreground mb-1">
-          상세정보를 입력하세요.
+          추가 정보를 입력하세요.
         </h3>
       </div>
 
@@ -150,7 +150,7 @@ export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProp
       {/* 제안 내용 */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <label className="text-sm font-bold text-foreground">① 제안 내용</label>
+          <label className="text-sm font-bold text-foreground">① 고객사 요구 사항</label>
           <Button 
             variant="ghost" 
             size="sm" 
@@ -165,8 +165,8 @@ export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProp
         <div className="space-y-2">
           {displayProposals.map((proposal: string, idx: number) => (
             <div key={idx} className="flex gap-2">
-              <Input
-                placeholder={`제안 내용을 입력하세요.`}
+              <Textarea
+                placeholder={`요구 사항을 입력하세요.`}
                 value={proposal}
                 onChange={(e) => handleUpdateProposal(idx, e.target.value)}
                 className="flex-1"
@@ -204,7 +204,7 @@ export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProp
         <div className="space-y-2">
           {displayCompetitors.map((competitor: string, idx: number) => (
             <div key={idx} className="flex gap-2">
-              <Input
+              <Textarea
                 placeholder={`경쟁사를 입력하세요.`}
                 value={competitor}
                 onChange={(e) => handleUpdateCompetitor(idx, e.target.value)}
@@ -243,7 +243,7 @@ export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProp
         <div className="space-y-2">
           {displayTargets.map((target: string, idx: number) => (
             <div key={idx} className="flex gap-2">
-              <Input
+              <Textarea
                 placeholder={`타겟 사용자를 입력하세요.`}
                 value={target}
                 onChange={(e) => handleUpdateTarget(idx, e.target.value)}

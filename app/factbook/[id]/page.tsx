@@ -3,11 +3,14 @@
 import { useState, useEffect, ReactNode } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUp } from "lucide-react"
+import { ArrowLeft, ArrowUp, Copy, Check } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { MediaTab } from "@/components/factbook/media-tab"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import * as AccordionPrimitive from "@radix-ui/react-accordion"
+import { ChevronDown } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ImageViewer } from "@/components/factbook/image-viewer"
 import ReactMarkdown, { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -55,8 +58,8 @@ interface FactbookDetail {
   sections: Section[]
 }
 
-// [[VISUALIZATION_DATA]] 블록만 잡고 뒤쪽 </answer> 등은 제외
-const visualizationBlockRegex = /\[\[VISUALIZATION_DATA\]\]\s*([\s\S]*?)(?:<\/answer>|$)/i
+// <viz>...</viz> 또는 구(旧) [[VISUALIZATION_DATA]] 블록을 파싱
+const visualizationBlockRegex = /<viz>([\s\S]*?)<\/viz>|\[\[VISUALIZATION_DATA\]\]\s*([\s\S]*?)(?:<\/answer>|$)/i
 // <think>, <reasoning> 등 다양한 변형 태그 제거
 const redactedReasoningRegex = /<(?:redacted_)?(?:reasoning|think)>[\s\S]*?<\/(?:redacted_)?(?:reasoning|think)>/gi
 // <answer> ... </answer> 블록만 출력 대상으로 사용
@@ -81,7 +84,8 @@ const parseVisualizations = (
 
   if (match && match[1]) {
     // [중요] 마크다운 코드 블록(```json 등) 제거 로직 추가
-    let jsonText = match[1].trim()
+    const captured = match[1] || match[2] || ""
+    let jsonText = captured.trim()
     jsonText = jsonText
       .replace(/^```json\s*/i, "")
       .replace(/^```\s*/i, "")
@@ -276,7 +280,7 @@ const renderChartComponent = (viz: VisualizationItem) => {
   }
 }
 
-const markdownComponents: Components = {
+const createMarkdownComponents = (sources: Source[] = [], onTableCopy?: () => void): Components => ({
   h1: ({ children, ...props }: any) => (
     <h1 {...props} className="text-2xl font-bold text-slate-900 mt-6 mb-4">
       {children}
@@ -356,31 +360,162 @@ const markdownComponents: Components = {
     const childrenStr = String(children)
     const citationMatch = childrenStr.match(/^CITATION_MARKER_(\d+)$/)
     const isCitation = !!citationMatch
-    const displayText = isCitation ? `[${citationMatch![1]}]` : children
-
+    
+    if (isCitation) {
+      const citationIndex = parseInt(citationMatch![1], 10) - 1 // 1-based to 0-based
+      const source = sources[citationIndex]
+      const displayText = `[${citationMatch![1]}]`
+      
+      if (source) {
+        // URL에서 도메인 추출
+        const getDomainFromUrl = (url: string) => {
+          try {
+            const urlObj = new URL(url)
+            return urlObj.hostname.replace('www.', '')
+          } catch {
+            return null
+          }
+        }
+        
+        const domain = href ? getDomainFromUrl(href) : null
+        const faviconUrl = domain 
+          ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16`
+          : null
+        
+        return (
+          <Tooltip delayDuration={0} disableHoverableContent>
+            <TooltipTrigger asChild>
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 cursor-pointer relative z-10 inline-block"
+                style={{ padding: '1px 0', margin: '0 1px' }}
+                {...props}
+              >
+                {displayText}
+              </a>
+            </TooltipTrigger>
+            <TooltipContent 
+              className="w-96 p-2 bg-white border border-slate-200 shadow-lg pointer-events-auto" 
+              side="top"
+              sideOffset={8}
+              onPointerDownOutside={(e) => {
+                // 다른 출처 링크나 툴팁으로 이동하는 경우 닫지 않음
+                const target = e.target as HTMLElement
+                if (target.closest('a[href]') || target.closest('[data-radix-tooltip-content]')) {
+                  e.preventDefault()
+                }
+              }}
+            >
+              <div className="flex items-center gap-2 text-xs">
+                {/* 웹사이트 아이콘 */}
+                {faviconUrl ? (
+                  <img 
+                    src={faviconUrl} 
+                    alt="" 
+                    className="w-4 h-4 flex-shrink-0"
+                    onError={(e) => {
+                      // favicon 로드 실패 시 기본 아이콘 표시
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
+                ) : (
+                  <span className="text-slate-400 w-4 h-4 flex-shrink-0">🌐</span>
+                )}
+                {/* 웹사이트 타이틀 */}
+                {source.title && (
+                  <>
+                    <span className="font-medium text-slate-900 truncate flex-1 min-w-0">{source.title}</span>
+                    <span className="text-slate-300 flex-shrink-0">|</span>
+                  </>
+                )}
+                {/* URL */}
+                {href && (
+                  <span className="text-slate-500 truncate flex-1 min-w-0">{href}</span>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )
+      }
+    }
+    
     return (
       <a
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={
-          isCitation
-            ? "text-blue-600 hover:text-blue-800 cursor-pointer"
-            : "text-blue-600 underline hover:text-blue-800"
-        }
+        className="text-blue-600 underline hover:text-blue-800"
         {...props}
       >
-        {displayText}
+        {children}
       </a>
     )
   },
-  table: ({ children, ...props }: any) => (
-    <div className="overflow-x-auto mb-4 my-6">
-      <table {...props} className="w-full border border-slate-300">
-        {children}
-      </table>
-    </div>
-  ),
+  table: ({ children, ...props }: any) => {
+    const [isHovered, setIsHovered] = useState(false)
+    const [isCopied, setIsCopied] = useState(false)
+    
+    const handleCopyTable = async (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      
+      try {
+        // 표를 텍스트로 변환
+        const table = e.currentTarget.closest('div')?.querySelector('table')
+        if (!table) return
+        
+        let text = ''
+        const rows = table.querySelectorAll('tr')
+        
+        rows.forEach((row, rowIndex) => {
+          const cells = row.querySelectorAll('th, td')
+          const rowText = Array.from(cells).map(cell => {
+            return cell.textContent?.trim() || ''
+          }).join('\t')
+          text += rowText + '\n'
+        })
+        
+        // 클립보드에 복사
+        await navigator.clipboard.writeText(text.trim())
+        setIsCopied(true)
+        onTableCopy?.()
+        
+        // 2초 후 복사 상태 초기화
+        setTimeout(() => {
+          setIsCopied(false)
+        }, 2000)
+      } catch (error) {
+        console.error('표 복사 실패:', error)
+      }
+    }
+    
+    return (
+      <div 
+        className="relative overflow-x-auto mb-4 my-6 group"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <table {...props} className="w-full border border-slate-300">
+          {children}
+        </table>
+        {isHovered && (
+          <button
+            onClick={handleCopyTable}
+            className="absolute top-2 right-2 z-10 p-2 bg-white border border-slate-300 rounded-md shadow-md hover:bg-slate-50 transition-all flex items-center justify-center"
+            title="표 복사"
+          >
+            {isCopied ? (
+              <Check className="w-4 h-4 text-green-600" />
+            ) : (
+              <Copy className="w-4 h-4 text-slate-600" />
+            )}
+          </button>
+        )}
+      </div>
+    )
+  },
   thead: ({ children, ...props }: any) => (
     <thead {...props} className="bg-slate-100">
       {children}
@@ -403,7 +538,7 @@ const markdownComponents: Components = {
     </td>
   ),
   hr: () => <hr className="my-6 border-slate-300" />,
-}
+})
 
 export default function FactbookDetailPage() {
   const params = useParams()
@@ -619,6 +754,13 @@ export default function FactbookDetailPage() {
     })
   }
 
+  const handleTableCopy = () => {
+    toast({
+      title: "표가 복사되었습니다.",
+      duration: 2000,
+    })
+  }
+
   const handleDelete = async () => {
     if (!confirm("팩트북을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
       return
@@ -699,7 +841,7 @@ export default function FactbookDetailPage() {
           <ReactMarkdown
             key={`md-${subSection.id}-${match.index}`}
             remarkPlugins={[remarkGfm]}
-            components={markdownComponents}
+            components={createMarkdownComponents(sources, handleTableCopy)}
           >
             {convertCitationLinks(textSegment, sources)}
           </ReactMarkdown>
@@ -735,7 +877,7 @@ export default function FactbookDetailPage() {
         <ReactMarkdown
           key={`md-${subSection.id}-last`}
           remarkPlugins={[remarkGfm]}
-          components={markdownComponents}
+          components={createMarkdownComponents(sources)}
         >
           {convertCitationLinks(remaining, sources)}
         </ReactMarkdown>
@@ -765,7 +907,16 @@ export default function FactbookDetailPage() {
     setIsManualScroll(true)
     const element = document.getElementById(`section-${subSectionId}`)
     if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" })
+      // 스크롤 인터랙션 없이 바로 이동
+      element.scrollIntoView({ behavior: "auto", block: "start" })
+    }
+  }
+
+  const handleSectionClick = (sectionId: string) => {
+    // 해당 섹션의 첫 번째 subSection으로 이동
+    const section = factbook?.sections.find((s) => s.id === sectionId)
+    if (section && section.subSections.length > 0) {
+      handleSubSectionClick(section.subSections[0].id)
     }
   }
 
@@ -834,9 +985,10 @@ export default function FactbookDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* 헤더 */}
-      <header className="sticky top-0 bg-white border-b border-slate-300 z-50">
+    <TooltipProvider delayDuration={0} skipDelayDuration={2000}>
+      <div className="min-h-screen bg-white">
+        {/* 헤더 */}
+        <header className="sticky top-0 bg-white border-b border-slate-300 z-50">
         <div className="max-w-full px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             {/* 왼쪽: 뒤로가기, 회사명 */}
@@ -916,11 +1068,26 @@ export default function FactbookDetailPage() {
             >
               {factbook.sections.map((section, idx) => {
                 const hasActiveSubSection = section.subSections.some((ss) => ss.id === activeSection)
+                const isExpanded = expandedSection === section.id
                 return (
                 <AccordionItem key={section.id} value={section.id}>
-                  <AccordionTrigger className="text-sm font-medium text-slate-900 py-2">
-                    {idx + 1}. {section.title}
-                  </AccordionTrigger>
+                  <AccordionPrimitive.Header className="flex">
+                    <button
+                      onClick={() => handleSectionClick(section.id)}
+                      className="flex flex-1 items-center text-left text-sm font-medium text-slate-900 py-2 hover:underline"
+                    >
+                      {idx + 1}. {section.title}
+                    </button>
+                    <AccordionPrimitive.Trigger
+                      className="flex items-center justify-center p-2 hover:bg-slate-100 rounded transition-all [&[data-state=open]>svg]:rotate-180"
+                      onClick={(e) => {
+                        // 화살표 버튼 클릭 시에만 토글
+                        e.stopPropagation()
+                      }}
+                    >
+                      <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                    </AccordionPrimitive.Trigger>
+                  </AccordionPrimitive.Header>
                   <AccordionContent>
                     <div className="space-y-1 pl-2">
                       {section.subSections.map((subSection) => {
@@ -1113,6 +1280,7 @@ export default function FactbookDetailPage() {
           onNext={handleNextImage}
         />
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
