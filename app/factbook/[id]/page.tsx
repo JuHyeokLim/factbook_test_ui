@@ -1183,23 +1183,57 @@ export default function FactbookDetailPage() {
                   <div className="space-y-3">
                       {activeSources
                         .filter((s) => !s.imageUrl && s.url)
-                      .map((source, idx) => (
-                          <a
-                          key={idx}
-                            href={source.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-white p-3 rounded border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
-                          >
-                            <p className="font-semibold text-slate-900 text-xs line-clamp-2 mb-2">{source.title || "제목 없음"}</p>
-                            {source.content && (
-                              <p className="text-slate-600 text-xs line-clamp-2 mb-2">{source.content}</p>
-                            )}
-                            {source.media && (
-                              <p className="text-blue-600 text-xs font-medium">{source.media}</p>
-                            )}
-                          </a>
-                      ))}
+                      .map((source, idx) => {
+                          // URL에서 도메인 추출
+                          const getDomainFromUrl = (url: string) => {
+                            try {
+                              const urlObj = new URL(url)
+                              return urlObj.hostname.replace('www.', '')
+                            } catch {
+                              return null
+                            }
+                          }
+                          
+                          const domain = source.url ? getDomainFromUrl(source.url) : null
+                          const faviconUrl = domain 
+                            ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16`
+                            : null
+                          
+                          return (
+                            <a
+                              key={idx}
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block bg-white p-3 rounded border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
+                            >
+                              {/* 아이콘 | 제목 (최대 2줄) */}
+                              <div className="flex items-start gap-2 text-xs mb-2">
+                                {/* 웹사이트 아이콘 */}
+                                {faviconUrl ? (
+                                  <img 
+                                    src={faviconUrl} 
+                                    alt="" 
+                                    className="w-4 h-4 flex-shrink-0 mt-0.5"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none'
+                                    }}
+                                  />
+                                ) : (
+                                  <span className="text-slate-400 w-4 h-4 flex-shrink-0 mt-0.5">🌐</span>
+                                )}
+                                {/* 웹사이트 타이틀 */}
+                                {source.title && (
+                                  <span className="font-semibold text-slate-900 line-clamp-2 flex-1 min-w-0">{source.title}</span>
+                                )}
+                              </div>
+                              {/* URL (최대 2줄) */}
+                              {source.url && (
+                                <p className="text-slate-600 text-xs line-clamp-2">{source.url}</p>
+                              )}
+                            </a>
+                          )
+                        })}
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500">출처 정보가 없습니다.</p>
