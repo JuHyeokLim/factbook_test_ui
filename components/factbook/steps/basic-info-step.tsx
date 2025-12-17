@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { RfpUploadStep } from "./rfp-upload-step"
+import { CompanySearchInput } from "../company-search-input"
 
 interface BasicInfoStepProps {
   method: "upload" | "manual"
@@ -13,10 +14,10 @@ interface BasicInfoStepProps {
 
 export function BasicInfoStep({ method, setMethod, formData, setFormData }: BasicInfoStepProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 min-h-[400px] py-4">
       {/* 제목 섹션 */}
       <div>
-        <h3 className="text-lg font-bold text-foreground mb-1">
+        <h3 className="text-lg font-bold text-foreground mb-2">
           기업명과 대상 사업/상품 정보를 입력하세요.
         </h3>
       </div>
@@ -41,7 +42,7 @@ export function BasicInfoStep({ method, setMethod, formData, setFormData }: Basi
 
       {/* RFP 업로드 모드 */}
       {method === "upload" && (
-        <div className="space-y-4">
+        <div className="space-y-6 py-4">
           <RfpUploadStep
             onExtractedData={(data) => {
               // 추출된 데이터로 폼 자동 채우기
@@ -75,16 +76,12 @@ export function BasicInfoStep({ method, setMethod, formData, setFormData }: Basi
 
       {/* 직접 입력 모드 */}
       {method === "manual" && (
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-bold mb-2 text-foreground">기업명</label>
-            <Input
-              placeholder="기업명을 입력하세요."
-              value={formData.companyName}
-              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-              className="h-11"
-            />
-          </div>
+        <div className="space-y-8 py-4">
+          <CompanySearchInput
+            value={formData.companyName}
+            onChange={(value) => setFormData({ ...formData, companyName: value })}
+            placeholder="기업명을 입력하세요"
+          />
 
           <div>
             <label className="block text-sm font-bold mb-2 text-foreground">대상 사업/상품</label>

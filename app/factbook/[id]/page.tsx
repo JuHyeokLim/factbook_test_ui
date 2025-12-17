@@ -3,7 +3,7 @@
 import { useState, useEffect, ReactNode } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUp, Copy, Check } from "lucide-react"
+import { ArrowLeft, ArrowUp, Copy, Check, Download } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { MediaTab } from "@/components/factbook/media-tab"
@@ -14,7 +14,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ImageViewer } from "@/components/factbook/image-viewer"
 import ReactMarkdown, { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
+import rehypeRaw from "rehype-raw"
 import { AreaChart, BarChart, Card, DonutChart, LineChart, Text, Title } from "@tremor/react"
+import { exportFactbookToWord } from "@/lib/exportUtils"
 
 interface Source {
   title: string
@@ -33,6 +35,7 @@ interface VisualizationItem {
   categories?: string[]
   category?: string; // 추가: 백엔드가 단일 카테고리(라벨) 키를 줄 경우 대비
   value?: string;    // 추가: 백엔드가 단일 값 키를 줄 경우 대비
+  colors?: string[]; // 추가: Tremor 차트 색상 배열
 }
 
 interface SubSection {
@@ -69,22 +72,13 @@ const answerBlockRegex = /<answer>([\s\S]*?)<\/answer>/gi
 const parseVisualizations = (
   rawContent: string
 ): { cleanedContent: string; visualizations: VisualizationItem[] } => {
-  // 1) reasoning/think 제거
-  let cleanedContent = rawContent.replace(redactedReasoningRegex, "")
-
-  // 2) answer 블록만 추출
-  const answerMatches = [...cleanedContent.matchAll(answerBlockRegex)]
-  if (answerMatches.length > 0) {
-    cleanedContent = answerMatches.map((m) => m[1]).join("\n\n")
-  }
-  cleanedContent = cleanedContent.trim()
-  
-  const match = cleanedContent.match(visualizationBlockRegex)
+  // 1) 먼저 원본 content에서 viz 블록 추출 (answer 태그 안팎 모두 처리 가능)
+  const vizMatch = rawContent.match(visualizationBlockRegex)
   let visualizations: VisualizationItem[] = []
 
-  if (match && match[1]) {
+  if (vizMatch && (vizMatch[1] || vizMatch[2])) {
     // [중요] 마크다운 코드 블록(```json 등) 제거 로직 추가
-    const captured = match[1] || match[2] || ""
+    const captured = vizMatch[1] || vizMatch[2] || ""
     let jsonText = captured.trim()
     jsonText = jsonText
       .replace(/^```json\s*/i, "")
@@ -115,7 +109,25 @@ const parseVisualizations = (
     }
   }
 
+  // 2) reasoning/think 제거
+  let cleanedContent = rawContent.replace(redactedReasoningRegex, "")
+
+  // 3) answer 블록만 추출
+  const answerMatches = [...cleanedContent.matchAll(answerBlockRegex)]
+  if (answerMatches.length > 0) {
+    cleanedContent = answerMatches.map((m) => m[1]).join("\n\n")
+  }
+  cleanedContent = cleanedContent.trim()
+
+  // 4) viz 블록 제거
   cleanedContent = cleanedContent.replace(visualizationBlockRegex, "").trim()
+  
+  // 5) 남아있는 커스텀 태그들 제거 (안전장치)
+  cleanedContent = cleanedContent.replace(/<\/?answer>/gi, "")
+  cleanedContent = cleanedContent.replace(/<\/?think>/gi, "")
+  cleanedContent = cleanedContent.replace(/<\/?reasoning>/gi, "")
+  cleanedContent = cleanedContent.trim()
+  
   return { cleanedContent, visualizations }
 }
 
@@ -187,11 +199,11 @@ const sanitizeVisualizationData = (
   return { data: sanitized, invalidRows }
 }
 
-// [수정] renderChartComponent 함수: 키 매핑 로직 추가
-const renderChartComponent = (viz: VisualizationItem) => {
+// [수정] renderChartComponent 함수: 키 매핑 로직 + 출처 표시 추가
+const renderChartComponent = (viz: VisualizationItem, sources?: Source[]) => {
   if (!viz) return null
 
-  const { id, component, title, data = [], index, categories = [], category, value } = viz
+  const { id, component, title, data = [], index, categories = [], category, value, colors } = viz
   const chartTitle = title || id
 
   // 1. 라벨(X축/항목명) 키 결정
@@ -208,6 +220,129 @@ const renderChartComponent = (viz: VisualizationItem) => {
     chartIndex, 
     chartCategories
   )
+
+  // 4. 커스텀 툴팁 생성 (출처 정보 포함)
+  const customTooltip = ({ payload, active }: any) => {
+    if (!active || !payload || payload.length === 0) return null
+    
+    const data = payload[0].payload
+    
+    // DonutChart의 경우 처리
+    if (component === "DonutChart") {
+      const categoryValue = data[chartIndex] // 기업명 등
+      const measureKey = chartCategories[0] // value 키
+      const measureValue = data[measureKey] // 실제 값
+      const sourceField = `${measureKey}_출처`
+      const sourceText = data[sourceField] || ""
+      
+      // 출처 번호에서 실제 출처 정보 추출
+      const sourceNumbers = sourceText.match(/\[(\d+)\]/g)
+      const sourceLinks = sourceNumbers?.map((match: string) => {
+        const num = parseInt(match.replace(/[\[\]]/g, ""), 10)
+        return sources?.[num - 1]
+      }).filter(Boolean)
+      
+      return (
+        <div className="bg-white border border-slate-300 rounded-lg shadow-lg p-3 max-w-xs">
+          <p className="font-semibold text-slate-900 mb-2 text-sm">
+            {categoryValue}
+          </p>
+          <div className="flex items-baseline gap-1.5 mb-2">
+            <span className="text-slate-700 text-xs">{measureKey}:</span>
+            <span className="font-semibold text-slate-900 text-sm">
+              {numberFormatter(measureValue)}
+            </span>
+            {sourceText && (
+              <span className="text-blue-600 text-xs">{sourceText}</span>
+            )}
+          </div>
+          {sourceLinks && sourceLinks.length > 0 && (
+            <div className="text-xs text-slate-500 space-y-0.5">
+              {sourceLinks.map((source: Source, sIdx: number) => (
+                <a
+                  key={sIdx}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline block truncate"
+                  title={source.title}
+                >
+                  {source.title || source.url}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+    
+    // Bar/Line/Area Chart의 경우
+    return (
+      <div className="bg-white border border-slate-300 rounded-lg shadow-lg p-3 max-w-xs">
+        {/* 인덱스 값 (연도, 월 등) */}
+        <p className="font-semibold text-slate-900 mb-2 text-sm">
+          {data[chartIndex]}
+        </p>
+        
+        {/* 각 카테고리 값과 출처 */}
+        <div className="space-y-1.5">
+          {payload.map((entry: any, idx: number) => {
+            const categoryName = entry.name
+            const categoryValue = entry.value
+            const sourceField = `${categoryName}_출처`
+            const sourceText = data[sourceField] || ""
+            
+            // 출처 번호에서 실제 출처 정보 추출
+            const sourceNumbers = sourceText.match(/\[(\d+)\]/g)
+            const sourceLinks = sourceNumbers?.map((match: string) => {
+              const num = parseInt(match.replace(/[\[\]]/g, ""), 10)
+              return sources?.[num - 1]
+            }).filter(Boolean)
+            
+            return (
+              <div key={idx} className="flex items-start gap-2">
+                {/* 색상 인디케이터 */}
+                <div 
+                  className="w-3 h-3 rounded-sm mt-0.5 flex-shrink-0" 
+                  style={{ backgroundColor: entry.color }}
+                />
+                <div className="flex-1 min-w-0">
+                  {/* 카테고리명과 값 */}
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-slate-700 text-xs">{categoryName}:</span>
+                    <span className="font-semibold text-slate-900 text-sm">
+                      {numberFormatter(categoryValue)}
+                    </span>
+                    {sourceText && (
+                      <span className="text-blue-600 text-xs">{sourceText}</span>
+                    )}
+                  </div>
+                  
+                  {/* 출처 링크 */}
+                  {sourceLinks && sourceLinks.length > 0 && (
+                    <div className="mt-1 text-xs text-slate-500">
+                      {sourceLinks.map((source: Source, sIdx: number) => (
+                        <a
+                          key={sIdx}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline block truncate"
+                          title={source.title}
+                        >
+                          {source.title || source.url}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   const renderFallback = (message: string) => (
     <Card className="border-slate-200 shadow-none">
@@ -238,7 +373,9 @@ const renderChartComponent = (viz: VisualizationItem) => {
           category={measureKey}
           index={chartIndex}
           valueFormatter={numberFormatter}
+          colors={colors}
           className="mt-2 h-40"
+          customTooltip={customTooltip}
         />
       </Card>
     )
@@ -249,8 +386,10 @@ const renderChartComponent = (viz: VisualizationItem) => {
     data: finalData,
     index: chartIndex,
     categories: chartCategories,
+    colors: colors,
     valueFormatter: numberFormatter,
     className: "mt-2 h-72",
+    customTooltip: customTooltip,
   }
 
   switch (component) {
@@ -408,7 +547,7 @@ const createMarkdownComponents = (sources: Source[] = [], onTableCopy?: () => vo
                 }
               }}
             >
-              <div className="flex items-center gap-2 text-xs">
+              <span className="flex items-center gap-2 text-xs">
                 {/* 웹사이트 아이콘 */}
                 {faviconUrl ? (
                   <img 
@@ -434,7 +573,7 @@ const createMarkdownComponents = (sources: Source[] = [], onTableCopy?: () => vo
                 {href && (
                   <span className="text-slate-500 truncate flex-1 min-w-0">{href}</span>
                 )}
-              </div>
+              </span>
             </TooltipContent>
           </Tooltip>
         )
@@ -799,6 +938,31 @@ export default function FactbookDetailPage() {
     }
   }
 
+  const handleExport = async () => {
+    if (!factbook) return
+    
+    try {
+      toast({
+        title: "문서를 생성하는 중입니다...",
+        duration: 2000,
+      })
+      
+      await exportFactbookToWord(factbook)
+      
+      toast({
+        title: "문서가 다운로드되었습니다.",
+        duration: 2000,
+      })
+    } catch (error) {
+      console.error("문서 내보내기 실패:", error)
+      toast({
+        title: "문서 내보내기에 실패했습니다.",
+        description: error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleScrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -824,6 +988,26 @@ export default function FactbookDetailPage() {
     })
   }
 
+  // 특수문자가 포함된 볼드체를 올바르게 파싱하기 위한 전처리
+  const preprocessMarkdown = (content: string): string => {
+    // ReactMarkdown이 제대로 파싱하지 못하는 볼드체 패턴들을 <strong> 태그로 변환
+    let processed = content
+    
+    // 특수문자 패턴: 괄호, %, 따옴표, 기타 등등
+    const hasSpecialChars = (text: string) => /[()%"'`~!@#$^&+=\[\]{}|\\:;<>,?/]/.test(text)
+    
+    // 모든 **텍스트** 패턴을 찾아서 특수문자가 있으면 <strong>으로 변환
+    // 더 포괄적인 패턴 사용
+    processed = processed.replace(/\*\*([^*\n]+?)\*\*/g, (match, text) => {
+      if (hasSpecialChars(text)) {
+        return `<strong>${text}</strong>`
+      }
+      return match
+    })
+    
+    return processed
+  }
+
   const renderContentWithCharts = (subSection: SubSection) => {
     const content = subSection.content || ""
     const visualizations = subSection.visualizations || []
@@ -841,9 +1025,10 @@ export default function FactbookDetailPage() {
           <ReactMarkdown
             key={`md-${subSection.id}-${match.index}`}
             remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
             components={createMarkdownComponents(sources, handleTableCopy)}
           >
-            {convertCitationLinks(textSegment, sources)}
+            {preprocessMarkdown(convertCitationLinks(textSegment, sources))}
           </ReactMarkdown>
         )
       }
@@ -858,7 +1043,7 @@ export default function FactbookDetailPage() {
           {viz ? (
             <>
               {console.log("renderContentWithCharts: renderChartComponent 호출, viz:", viz)}
-              {renderChartComponent(viz)}
+              {renderChartComponent(viz, sources)}
             </>
           ) : (
             <div className="text-xs text-slate-500 italic border border-dashed border-slate-300 rounded p-3">
@@ -877,9 +1062,10 @@ export default function FactbookDetailPage() {
         <ReactMarkdown
           key={`md-${subSection.id}-last`}
           remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw]}
           components={createMarkdownComponents(sources)}
         >
-          {convertCitationLinks(remaining, sources)}
+          {preprocessMarkdown(convertCitationLinks(remaining, sources))}
         </ReactMarkdown>
       )
     }
@@ -890,7 +1076,7 @@ export default function FactbookDetailPage() {
       unusedVisualizations.forEach((viz) => {
         nodes.push(
           <div key={`chart-${subSection.id}-${viz.id}-fallback`} className="my-4">
-            {renderChartComponent(viz)}
+            {renderChartComponent(viz, sources)}
           </div>
         )
       })
@@ -1029,6 +1215,15 @@ export default function FactbookDetailPage() {
 
             {/* 오른쪽: 액션 버튼 */}
             <div className="flex items-center gap-2 flex-shrink-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExport} 
+                className="h-8 text-slate-700 text-xs border-slate-300 hover:bg-slate-50 flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                내보내기
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm" 

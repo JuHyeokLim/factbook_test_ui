@@ -124,3 +124,115 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Tremor 차트 색상 강제 적용 (Tailwind v4 호환성) */
+[class*="fill-blue"] {
+  fill: #3b82f6 !important;
+}
+[class*="fill-cyan"] {
+  fill: #06b6d4 !important;
+}
+[class*="fill-emerald"] {
+  fill: #10b981 !important;
+}
+[class*="fill-violet"] {
+  fill: #8b5cf6 !important;
+}
+[class*="fill-amber"] {
+  fill: #f59e0b !important;
+}
+[class*="fill-gray"] {
+  fill: #6b7280 !important;
+}
+[class*="fill-pink"] {
+  fill: #ec4899 !important;
+}
+[class*="fill-lime"] {
+  fill: #84cc16 !important;
+}
+[class*="fill-fuchsia"] {
+  fill: #d946ef !important;
+}
+[class*="fill-green"] {
+  fill: #22c55e !important;
+}
+[class*="fill-red"] {
+  fill: #ef4444 !important;
+}
+[class*="fill-indigo"] {
+  fill: #6366f1 !important;
+}
+[class*="fill-purple"] {
+  fill: #a855f7 !important;
+}
+[class*="fill-yellow"] {
+  fill: #eab308 !important;
+}
+[class*="fill-teal"] {
+  fill: #14b8a6 !important;
+}
+[class*="fill-orange"] {
+  fill: #f97316 !important;
+}
+[class*="fill-sky"] {
+  fill: #0ea5e9 !important;
+}
+[class*="fill-rose"] {
+  fill: #f43f5e !important;
+}
+
+/* stroke도 동일하게 적용 */
+[class*="stroke-blue"] {
+  stroke: #3b82f6 !important;
+}
+[class*="stroke-cyan"] {
+  stroke: #06b6d4 !important;
+}
+[class*="stroke-emerald"] {
+  stroke: #10b981 !important;
+}
+[class*="stroke-violet"] {
+  stroke: #8b5cf6 !important;
+}
+[class*="stroke-amber"] {
+  stroke: #f59e0b !important;
+}
+[class*="stroke-gray"] {
+  stroke: #6b7280 !important;
+}
+[class*="stroke-pink"] {
+  stroke: #ec4899 !important;
+}
+[class*="stroke-lime"] {
+  stroke: #84cc16 !important;
+}
+[class*="stroke-fuchsia"] {
+  stroke: #d946ef !important;
+}
+[class*="stroke-green"] {
+  stroke: #22c55e !important;
+}
+[class*="stroke-red"] {
+  stroke: #ef4444 !important;
+}
+[class*="stroke-indigo"] {
+  stroke: #6366f1 !important;
+}
+[class*="stroke-purple"] {
+  stroke: #a855f7 !important;
+}
+[class*="stroke-yellow"] {
+  stroke: #eab308 !important;
+}
+[class*="stroke-teal"] {
+  stroke: #14b8a6 !important;
+}
+[class*="stroke-orange"] {
+  stroke: #f97316 !important;
+}
+[class*="stroke-sky"] {
+  stroke: #0ea5e9 !important;
+}
+[class*="stroke-rose"] {
+  stroke: #f43f5e !important;
+}
