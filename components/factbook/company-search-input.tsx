@@ -154,7 +154,7 @@ export function CompanySearchInput({
       }
 
       setIsInitializing(true)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
       cachePromise = fetch(`${apiUrl}/api/dart/corp-code-list`)
         .then((res) => res.json())
         .then((data: Company[]) => {
