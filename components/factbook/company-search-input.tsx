@@ -285,29 +285,44 @@ export function CompanySearchInput({
         {open && candidates.length > 0 && (
           <div
             ref={dropdownRef}
-            className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-[300px] overflow-auto"
+            className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-[320px] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200"
           >
-            <div className="p-2 text-xs font-medium text-gray-500 border-b">
+            <div className="px-4 py-2.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-white border-b border-slate-100">
               DART 등록 기업 ({candidates.length}개)
             </div>
-            {candidates.map((candidate) => (
-              <button
-                key={candidate.corp_code}
-                onClick={() => handleSelect(candidate.company_name)}
-                className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors flex items-center gap-2"
-              >
-                <Check
-                  className={cn(
-                    "h-4 w-4 flex-shrink-0",
-                    value === candidate.company_name ? "opacity-100" : "opacity-0"
-                  )}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">{candidate.company_name}</div>
-                  <div className="text-xs text-gray-500">유사도: {candidate.similarity}%</div>
-                </div>
-              </button>
-            ))}
+            <div className="overflow-y-auto py-1 bg-white">
+              {candidates.map((candidate) => (
+                <button
+                  key={candidate.corp_code}
+                  onClick={() => handleSelect(candidate.company_name)}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-all flex items-center gap-3 group relative"
+                >
+                  <div className={cn(
+                    "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                    value === candidate.company_name 
+                      ? "bg-blue-600 border-blue-600 text-white" 
+                      : "bg-white border-slate-200 text-transparent group-hover:border-blue-400"
+                  )}>
+                    <Check className="h-3 w-3" />
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className={cn(
+                      "font-semibold text-sm truncate transition-colors",
+                      value === candidate.company_name ? "text-blue-600" : "text-slate-700 group-hover:text-slate-900"
+                    )}>
+                      {candidate.company_name}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full group-hover:bg-slate-200 transition-colors">
+                    <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-700">
+                      {candidate.similarity}% 일치
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

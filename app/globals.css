@@ -136,226 +136,45 @@
 }
 
 /* Tremor 차트 색상 강제 적용 (Tailwind v4 호환성) */
-[class*="fill-blue"] {
-  fill: #3b82f6 !important;
-}
-[class*="fill-cyan"] {
-  fill: #06b6d4 !important;
-}
-[class*="fill-emerald"] {
-  fill: #10b981 !important;
-}
-[class*="fill-violet"] {
-  fill: #8b5cf6 !important;
-}
-[class*="fill-amber"] {
-  fill: #f59e0b !important;
-}
-[class*="fill-gray"] {
-  fill: #6b7280 !important;
-}
-[class*="fill-pink"] {
-  fill: #ec4899 !important;
-}
-[class*="fill-lime"] {
-  fill: #84cc16 !important;
-}
-[class*="fill-fuchsia"] {
-  fill: #d946ef !important;
-}
-[class*="fill-green"] {
-  fill: #22c55e !important;
-}
-[class*="fill-red"] {
-  fill: #ef4444 !important;
-}
-[class*="fill-indigo"] {
-  fill: #6366f1 !important;
-}
-[class*="fill-purple"] {
-  fill: #a855f7 !important;
-}
-[class*="fill-yellow"] {
-  fill: #eab308 !important;
-}
-[class*="fill-teal"] {
-  fill: #14b8a6 !important;
-}
-[class*="fill-orange"] {
-  fill: #f97316 !important;
-}
-[class*="fill-sky"] {
-  fill: #0ea5e9 !important;
-}
-[class*="fill-rose"] {
-  fill: #f43f5e !important;
-}
+/* 차트 내부의 path, circle 등에만 적용되도록 범위를 제한합니다 */
+.recharts-surface [class*="fill-blue"] { fill: #3b82f6 !important; }
+.recharts-surface [class*="fill-cyan"] { fill: #06b6d4 !important; }
+.recharts-surface [class*="fill-emerald"] { fill: #10b981 !important; }
+.recharts-surface [class*="fill-violet"] { fill: #8b5cf6 !important; }
+.recharts-surface [class*="fill-amber"] { fill: #f59e0b !important; }
+.recharts-surface [class*="fill-gray"] { fill: #6b7280 !important; }
+.recharts-surface [class*="fill-pink"] { fill: #ec4899 !important; }
+.recharts-surface [class*="fill-indigo"] { fill: #6366f1 !important; }
 
-/* stroke도 동일하게 적용 */
-[class*="stroke-blue"] {
-  stroke: #3b82f6 !important;
-}
-[class*="stroke-cyan"] {
-  stroke: #06b6d4 !important;
-}
-[class*="stroke-emerald"] {
-  stroke: #10b981 !important;
-}
-[class*="stroke-violet"] {
-  stroke: #8b5cf6 !important;
-}
-[class*="stroke-amber"] {
-  stroke: #f59e0b !important;
-}
-[class*="stroke-gray"] {
-  stroke: #6b7280 !important;
-}
-[class*="stroke-pink"] {
-  stroke: #ec4899 !important;
-}
-[class*="stroke-lime"] {
-  stroke: #84cc16 !important;
-}
-[class*="stroke-fuchsia"] {
-  stroke: #d946ef !important;
-}
-[class*="stroke-green"] {
-  stroke: #22c55e !important;
-}
-[class*="stroke-red"] {
-  stroke: #ef4444 !important;
-}
-[class*="stroke-indigo"] {
-  stroke: #6366f1 !important;
-}
-[class*="stroke-purple"] {
-  stroke: #a855f7 !important;
-}
-[class*="stroke-yellow"] {
-  stroke: #eab308 !important;
-}
-[class*="stroke-teal"] {
-  stroke: #14b8a6 !important;
-}
-[class*="stroke-orange"] {
-  stroke: #f97316 !important;
-}
-[class*="stroke-sky"] {
-  stroke: #0ea5e9 !important;
-}
-[class*="stroke-rose"] {
-  stroke: #f43f5e !important;
-}
+.recharts-surface [class*="stroke-blue"] { stroke: #3b82f6 !important; }
+.recharts-surface [class*="stroke-cyan"] { stroke: #06b6d4 !important; }
+.recharts-surface [class*="stroke-emerald"] { stroke: #10b981 !important; }
+.recharts-surface [class*="stroke-violet"] { stroke: #8b5cf6 !important; }
+.recharts-surface [class*="stroke-amber"] { stroke: #f59e0b !important; }
+.recharts-surface [class*="stroke-gray"] { stroke: #6b7280 !important; }
+.recharts-surface [class*="stroke-pink"] { stroke: #ec4899 !important; }
+.recharts-surface [class*="stroke-indigo"] { stroke: #6366f1 !important; }
 
-/* background도 동일하게 적용 (Legend dot용) */
-[class*="bg-blue"] {
-  background-color: #3b82f6 !important;
-}
-[class*="bg-cyan"] {
-  background-color: #06b6d4 !important;
-}
-[class*="bg-emerald"] {
-  background-color: #10b981 !important;
-}
-[class*="bg-violet"] {
-  background-color: #8b5cf6 !important;
-}
-[class*="bg-amber"] {
-  background-color: #f59e0b !important;
-}
-[class*="bg-gray"] {
-  background-color: #6b7280 !important;
-}
-[class*="bg-pink"] {
-  background-color: #ec4899 !important;
-}
-[class*="bg-lime"] {
-  background-color: #84cc16 !important;
-}
-[class*="bg-fuchsia"] {
-  background-color: #d946ef !important;
-}
-[class*="bg-green"] {
-  background-color: #22c55e !important;
-}
-[class*="bg-red"] {
-  background-color: #ef4444 !important;
-}
-[class*="bg-indigo"] {
-  background-color: #6366f1 !important;
-}
-[class*="bg-purple"] {
-  background-color: #a855f7 !important;
-}
-[class*="bg-yellow"] {
-  background-color: #eab308 !important;
-}
-[class*="bg-teal"] {
-  background-color: #14b8a6 !important;
-}
-[class*="bg-orange"] {
-  background-color: #f97316 !important;
-}
-[class*="bg-sky"] {
-  background-color: #0ea5e9 !important;
-}
-[class*="bg-rose"] {
-  background-color: #f43f5e !important;
-}
+/* Legend 색상 (text-* 클래스에 color 속성 강제 적용) */
+/* Legend 아이템 내부에만 적용되도록 범위를 제한합니다 */
+ol[class*="Legend"] [class*="text-blue"] { color: #3b82f6 !important; }
+ol[class*="Legend"] [class*="text-cyan"] { color: #06b6d4 !important; }
+ol[class*="Legend"] [class*="text-emerald"] { color: #10b981 !important; }
+ol[class*="Legend"] [class*="text-violet"] { color: #8b5cf6 !important; }
+ol[class*="Legend"] [class*="text-amber"] { color: #f59e0b !important; }
+ol[class*="Legend"] [class*="text-gray"] { color: #6b7280 !important; }
+ol[class*="Legend"] [class*="text-pink"] { color: #ec4899 !important; }
+ol[class*="Legend"] [class*="text-indigo"] { color: #6366f1 !important; }
 
-/* Tremor Legend 색상 - text-* 클래스에 color 속성 강제 적용 */
-/* SVG가 fill="currentColor"를 사용하므로 color 속성이 필요합니다 */
-[class*="text-blue"] {
-  color: #3b82f6 !important;
-}
-[class*="text-cyan"] {
-  color: #06b6d4 !important;
-}
-[class*="text-emerald"] {
-  color: #10b981 !important;
-}
-[class*="text-violet"] {
-  color: #8b5cf6 !important;
-}
-[class*="text-amber"] {
-  color: #f59e0b !important;
-}
-[class*="text-gray"] {
-  color: #6b7280 !important;
-}
-[class*="text-pink"] {
-  color: #ec4899 !important;
-}
-[class*="text-indigo"] {
-  color: #6366f1 !important;
-}
-[class*="text-lime"] {
-  color: #84cc16 !important;
-}
-[class*="text-green"] {
-  color: #22c55e !important;
-}
-[class*="text-red"] {
-  color: #ef4444 !important;
-}
-[class*="text-purple"] {
-  color: #a855f7 !important;
-}
-[class*="text-yellow"] {
-  color: #eab308 !important;
-}
-[class*="text-teal"] {
-  color: #14b8a6 !important;
-}
-[class*="text-orange"] {
-  color: #f97316 !important;
-}
-[class*="text-sky"] {
-  color: #0ea5e9 !important;
-}
-[class*="text-rose"] {
-  color: #f43f5e !important;
-}
+/* Legend 배경색 (dot용) */
+ol[class*="Legend"] [class*="bg-blue"] { background-color: #3b82f6 !important; }
+ol[class*="Legend"] [class*="bg-cyan"] { background-color: #06b6d4 !important; }
+ol[class*="Legend"] [class*="bg-emerald"] { background-color: #10b981 !important; }
+ol[class*="Legend"] [class*="bg-violet"] { background-color: #8b5cf6 !important; }
+ol[class*="Legend"] [class*="bg-amber"] { background-color: #f59e0b !important; }
+ol[class*="Legend"] [class*="bg-gray"] { background-color: #6b7280 !important; }
+ol[class*="Legend"] [class*="bg-pink"] { background-color: #ec4899 !important; }
+ol[class*="Legend"] [class*="bg-indigo"] { background-color: #6366f1 !important; }
 
 /* Legend 내부 SVG가 currentColor를 상속받도록 보장 */
 ol[class*="Legend"] li svg[fill="currentColor"] {
