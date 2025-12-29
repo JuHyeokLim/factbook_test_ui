@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { BasicInfoStep } from "./steps/basic-info-step"
 import { DetailedInfoStep } from "./steps/detailed-info-step"
@@ -46,6 +46,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
   const [currentStep, setCurrentStep] = useState(0)
   const [method, setMethod] = useState<"upload" | "manual">("upload")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [formData, setFormData] = useState({
     companyName: "",
     productName: "",
@@ -71,6 +72,65 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
     { title: "추가정보 입력", value: "additional" },
     { title: "메뉴 구성", value: "menu" },
   ]
+
+  // 모달이 열릴 때마다 상태 초기화
+  useEffect(() => {
+    if (open) {
+      setCurrentStep(0)
+      setMethod("upload")
+      setFormData({
+        companyName: "",
+        productName: "",
+        category: "",
+        proposals: [""],
+        competitors: [""],
+        targetUsers: [""],
+        analysisItems: {
+          media: false,
+        },
+        menuItems: getDefaultMenuItems(),
+        companyInfoItems: {
+          basic: true,
+          philosophy: true,
+          history: true,
+          business: true,
+          finance: true,
+        },
+      })
+    }
+  }, [open])
+
+  // Step 3으로 이동할 때 스크롤을 최상단으로 이동
+  useEffect(() => {
+    if (currentStep === 2 && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
+  }, [currentStep])
+
+  // 작성 중인 내용이 있는지 확인
+  const hasUnsavedChanges = (): boolean => {
+    return (
+      formData.companyName.trim() !== "" ||
+      formData.productName.trim() !== "" ||
+      formData.category !== "" ||
+      formData.proposals.some((p: string) => p.trim() !== "") ||
+      formData.competitors.some((c: string) => c.trim() !== "") ||
+      formData.targetUsers.some((t: string) => t.trim() !== "") ||
+      currentStep > 0
+    )
+  }
+
+  // 모달 닫기 핸들러 (확인 다이얼로그 포함)
+  const handleModalClose = (newOpen: boolean) => {
+    if (!newOpen && hasUnsavedChanges() && !isSubmitting) {
+      // 작성 중인 내용이 있으면 확인
+      if (confirm("작성 중인 내용이 있습니다. 정말 닫으시겠습니까?")) {
+        onOpenChange(false)
+      }
+    } else {
+      onOpenChange(newOpen)
+    }
+  }
 
   const handleNext = async () => {
     if (currentStep < steps.length - 1) {
@@ -143,7 +203,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
       const requestBody = {
         company_name: formData.companyName,
         product_name: formData.productName || null,
-        category: formData.category || null,
+        category: formData.category || "기타",
         proposals: cleanedProposals,
         competitors: cleanedCompetitors,
         target_users: cleanedTargetUsers,
@@ -207,7 +267,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleModalClose}>
       <DialogContent className={`${currentStep === 2 ? "!max-w-[95vw] !w-[95vw] sm:!max-w-[95vw]" : "max-w-2xl"} max-h-[90vh] flex flex-col p-6`}>
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>팩트북 만들기</DialogTitle>
@@ -230,7 +290,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
           </div>
         </DialogHeader>
 
-        <div className="mt-6 flex-1 overflow-y-auto">
+        <div ref={scrollContainerRef} className="mt-6 flex-1 overflow-y-auto">
           {currentStep === 0 && (
             <BasicInfoStep
               method={method}

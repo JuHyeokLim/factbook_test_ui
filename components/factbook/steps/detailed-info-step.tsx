@@ -38,6 +38,7 @@ const CATEGORY_OPTIONS = [
   { value: "관공서및단체", label: "관공서 및 단체", description: "정부기관, 공공기관" },
   { value: "교육", label: "교육", description: "교육기관, 교육서비스" },
   { value: "그룹광고", label: "그룹광고", description: "그룹 CI, 통합 광고" },
+  { value: "기타", label: "기타", description: "기타 업종" },
 ]
 
 export function DetailedInfoStep({ formData, setFormData }: DetailedInfoStepProps) {

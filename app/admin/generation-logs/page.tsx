@@ -108,6 +108,22 @@ export default function GenerationLogsPage() {
     return new Date(dateString).toLocaleString("ko-KR")
   }
 
+  const formatUSD = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 4,
+    }).format(amount)
+  }
+
+  const formatKRW = (amount: number) => {
+    const krw = amount * 1350 // 환율 1,350원 가정
+    return new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency: "KRW",
+    }).format(krw)
+  }
+
   const getStatusBadge = (log: GenerationLog) => {
     if (log.error_message) {
       return (
@@ -242,6 +258,11 @@ export default function GenerationLogsPage() {
                         <div className="text-sm text-muted-foreground mt-1">
                           팩트북 #{log.factbook_id} • {formatDate(log.created_at)}
                         </div>
+                        {log.api_params?.cost?.total_cost !== undefined && (
+                          <div className="text-xs font-medium text-blue-600 mt-1">
+                            비용: {formatKRW(log.api_params.cost.total_cost)} ({formatUSD(log.api_params.cost.total_cost)})
+                          </div>
+                        )}
                       </div>
                       {getStatusBadge(log)}
                     </div>
@@ -276,6 +297,16 @@ export default function GenerationLogsPage() {
                     }`}
                   >
                     프롬프트
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("cost")}
+                    className={`px-4 py-2 border-b-2 transition-colors ${
+                      activeTab === "cost"
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    비용
                   </button>
                   <button
                     onClick={() => setActiveTab("params")}
@@ -325,6 +356,96 @@ export default function GenerationLogsPage() {
                         {selectedLog.user_prompt}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {activeTab === "cost" && (
+                  <div className="space-y-6">
+                    {selectedLog.api_params?.cost ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <Card>
+                            <CardHeader className="py-2 px-4">
+                              <CardDescription>총 비용 (원화)</CardDescription>
+                            </CardHeader>
+                            <CardContent className="py-2 px-4">
+                              <div className="text-xl font-bold text-blue-600">
+                                {formatKRW(selectedLog.api_params.cost.total_cost)}
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader className="py-2 px-4">
+                              <CardDescription>총 비용 (USD)</CardDescription>
+                            </CardHeader>
+                            <CardContent className="py-2 px-4">
+                              <div className="text-xl font-bold text-gray-700">
+                                {formatUSD(selectedLog.api_params.cost.total_cost)}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+
+                        <div>
+                          <h3 className="font-semibold mb-2 text-sm">상세 사용량</h3>
+                          <div className="bg-muted p-4 rounded-md">
+                            <table className="w-full text-sm">
+                              <tbody>
+                                <tr className="border-b border-muted-foreground/20">
+                                  <td className="py-2 text-muted-foreground">모델</td>
+                                  <td className="py-2 font-medium text-right">{selectedLog.api_params.actual_model || selectedLog.api_params.model}</td>
+                                </tr>
+                                <tr className="border-b border-muted-foreground/20">
+                                  <td className="py-2 text-muted-foreground">Input 토큰</td>
+                                  <td className="py-2 font-medium text-right">{selectedLog.api_params.usage?.prompt_tokens?.toLocaleString()}</td>
+                                </tr>
+                                <tr className="border-b border-muted-foreground/20">
+                                  <td className="py-2 text-muted-foreground">Output 토큰</td>
+                                  <td className="py-2 font-medium text-right">{selectedLog.api_params.usage?.completion_tokens?.toLocaleString()}</td>
+                                </tr>
+                                {selectedLog.api_params.usage?.num_search_queries > 0 && (
+                                  <tr className="border-b border-muted-foreground/20">
+                                    <td className="py-2 text-muted-foreground">검색 쿼리</td>
+                                    <td className="py-2 font-medium text-right">{selectedLog.api_params.usage.num_search_queries}회</td>
+                                  </tr>
+                                )}
+                                {selectedLog.api_params.usage?.reasoning_tokens > 0 && (
+                                  <tr className="border-b border-muted-foreground/20">
+                                    <td className="py-2 text-muted-foreground">Reasoning 토큰</td>
+                                    <td className="py-2 font-medium text-right">{selectedLog.api_params.usage.reasoning_tokens.toLocaleString()}</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {selectedLog.api_params.cost.details && (
+                          <div>
+                            <h3 className="font-semibold mb-2 text-sm">비용 상세 (USD)</h3>
+                            <div className="bg-muted p-4 rounded-md">
+                              <table className="w-full text-xs text-muted-foreground">
+                                <tbody>
+                                  {Object.entries(selectedLog.api_params.cost.details).map(([key, value]: [string, any]) => (
+                                    value > 0 && (
+                                      <tr key={key}>
+                                        <td className="py-1 capitalize">{key}</td>
+                                        <td className="py-1 text-right">${value.toFixed(6)}</td>
+                                      </tr>
+                                    )
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground italic">
+                        <AlertCircle className="w-8 h-8 mb-2 opacity-20" />
+                        비용 정보가 없는 로그입니다.
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -18,6 +18,8 @@ interface Factbook {
   status: "draft" | "generating" | "completed" | "failed"
   createdAt: string
   updatedAt: string
+  rawCreatedAt: string
+  menuItems: any
   viewCount?: number
 }
 
@@ -50,10 +52,12 @@ export function FactbookList() {
           id: String(item.id),
           companyName: item.company_name || "",
           productName: item.product_name || "",
-          category: item.category || "",
+          category: item.category || "기타",
           status: item.status || "draft",
+          menuItems: item.menu_items || {},
           createdAt: item.created_at ? new Date(item.created_at).toLocaleDateString("ko-KR") : "",
           updatedAt: item.updated_at ? new Date(item.updated_at).toLocaleDateString("ko-KR") : "",
+          rawCreatedAt: item.created_at || "",
           viewCount: 0,
         }))
 
@@ -74,6 +78,51 @@ export function FactbookList() {
     },
     [toast],
   )
+
+  const calculateEstimatedCompletionTime = (factbook: Factbook) => {
+    if (!factbook.menuItems || !factbook.rawCreatedAt) return null
+
+    const weights = {
+      dart_basic: 10,
+      dart_finance: 35, // 15 + viz*2
+      pplx_normal: 25,
+      pplx_deep: 45, // 35 + viz*1
+    }
+
+    const sectionTimes = Object.keys(factbook.menuItems).map((section) => {
+      const tasks = factbook.menuItems[section]
+      if (!Array.isArray(tasks) || tasks.length === 0) return 0
+
+      let total = 0
+      tasks.forEach((taskName: string) => {
+        if (taskName.includes("기본 정보")) total += weights.dart_basic
+        else if (taskName.includes("재무 정보")) total += weights.dart_finance
+        else if (
+          taskName.includes("역사") ||
+          taskName.includes("SWOT") ||
+          taskName.includes("인사이트") ||
+          taskName.includes("분석")
+        ) {
+          total += weights.pplx_deep
+        } else {
+          total += weights.pplx_normal
+        }
+      })
+      return total
+    })
+
+    const maxSectionTimeSeconds = Math.max(...sectionTimes, 0) + 10 // buffer
+    
+    // 서버(UTC) 시간을 한국 시간(KST)으로 강제 변환하기 위해 9시간을 더함
+    const date = new Date(factbook.rawCreatedAt)
+    date.setHours(date.getHours() + 9)
+    date.setSeconds(date.getSeconds() + maxSectionTimeSeconds)
+
+    const h = String(date.getHours()).padStart(2, "0")
+    const m = String(date.getMinutes()).padStart(2, "0")
+    
+    return `${h}:${m}`
+  }
 
   useEffect(() => {
     fetchFactbooks({ showLoading: true })
@@ -117,7 +166,7 @@ export function FactbookList() {
     const shareUrl = `${window.location.origin}/factbook/${id}`
     navigator.clipboard.writeText(shareUrl)
     toast({
-      title: "공유링크가 복사되었습니다.",
+      title: "공유 링크가 복사되었습니다.",
       duration: 1000,
     })
   }
@@ -196,6 +245,7 @@ export function FactbookList() {
             <SelectItem value="관공서및단체">관공서 및 단체</SelectItem>
             <SelectItem value="교육및복지후생">교육 및 복지후생</SelectItem>
             <SelectItem value="그룹및기업광고">그룹 및 기업광고</SelectItem>
+            <SelectItem value="기타">기타</SelectItem>
           </SelectContent>
         </Select>
         <Select value={sortBy} onValueChange={setSortBy}>
@@ -257,7 +307,7 @@ export function FactbookList() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleShare(factbook.companyName)}>공유</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleShare(factbook.id)}>공유</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDelete(factbook.id)} className="text-destructive">
                           삭제
                         </DropdownMenuItem>
@@ -279,9 +329,14 @@ export function FactbookList() {
                     </Button>
                   </Link>
                 ) : (
-                  <div className="text-sm text-muted-foreground flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    {factbook.status === "draft" ? "생성 준비 중..." : "생성 중..."}
+                  <div className="text-sm text-muted-foreground flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <span>{factbook.status === "draft" ? "생성 준비 중..." : "생성 중..."}</span>
+                    </div>
+                    <div className="text-xs text-blue-600 font-medium ml-6">
+                      예상 완료 시간: {calculateEstimatedCompletionTime(factbook) || "--:--"}
+                    </div>
                   </div>
                 )}
 
@@ -319,9 +374,14 @@ export function FactbookList() {
                       </Button>
                     </Link>
                   ) : (
-                    <div className="text-sm text-muted-foreground flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                      {factbook.status === "draft" ? "생성 준비 중..." : "생성 중..."}
+                    <div className="text-sm text-muted-foreground flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <span>{factbook.status === "draft" ? "생성 준비 중..." : "생성 중..."}</span>
+                      </div>
+                      <div className="text-xs text-blue-600 font-medium ml-6">
+                        예상 완료: {calculateEstimatedCompletionTime(factbook) || "--:--"}
+                      </div>
                     </div>
                   )}
 

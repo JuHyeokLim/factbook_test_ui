@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect } from "react"
-import { X, ChevronLeft, ChevronRight } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface ImageViewerProps {
@@ -13,10 +13,125 @@ interface ImageViewerProps {
 }
 
 export function ImageViewer({ images, currentIndex, onClose, onPrevious, onNext }: ImageViewerProps) {
+  const [zoom, setZoom] = useState(1)
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const imageRef = useRef<HTMLImageElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  
   const hasPrevious = currentIndex > 0
   const hasNext = currentIndex < images.length - 1
 
-  // 키보드 이벤트 핸들러 (방향키로 이미지 네비게이션)
+  const MIN_ZOOM = 0.1
+  const MAX_ZOOM = 5
+  const ZOOM_STEP = 0.1
+
+  // 이미지가 변경되면 줌과 위치 리셋
+  useEffect(() => {
+    setZoom(1)
+    setPosition({ x: 0, y: 0 })
+  }, [currentIndex])
+
+  // 줌 인
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + ZOOM_STEP, MAX_ZOOM))
+  }
+
+  // 줌 아웃
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - ZOOM_STEP, MIN_ZOOM))
+  }
+
+  // 줌 리셋
+  const handleResetZoom = () => {
+    setZoom(1)
+    setPosition({ x: 0, y: 0 })
+  }
+
+  // 마우스 휠로 줌
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+    setZoom((prev) => {
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev + delta))
+      return newZoom
+    })
+  }
+
+  // 드래그 시작
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom > 1) {
+      setIsDragging(true)
+      setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
+    }
+  }
+
+  // 드래그 중
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && zoom > 1) {
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      })
+    }
+  }
+
+  // 드래그 종료
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  // 더블클릭으로 줌 리셋
+  const handleDoubleClick = () => {
+    handleResetZoom()
+  }
+
+  // 이미지 다운로드
+  const handleDownload = async () => {
+    try {
+      const imageUrl = images[currentIndex]
+      
+      // CORS 문제를 방지하기 위해 fetch 대신 a 태그를 사용하여 새 탭에서 열거나 
+      // 가능한 경우 다운로드를 시도합니다.
+      try {
+        const response = await fetch(imageUrl, { mode: 'cors' })
+        if (!response.ok) throw new Error('Network response was not ok')
+        
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        
+        // 파일명 추출 (URL에서)
+        const urlParts = imageUrl.split("/")
+        let fileName = urlParts[urlParts.length - 1]?.split("?")[0] || `image-${currentIndex + 1}.jpg`
+        if (!fileName.includes(".")) fileName += ".jpg"
+        
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      } catch (e) {
+        // CORS 에러가 발생할 경우 새 탭에서 이미지를 엽니다.
+        const link = document.createElement("a")
+        link.href = imageUrl
+        link.target = "_blank"
+        link.rel = "noopener noreferrer"
+        // 일부 브라우저에서는 외부 도메인이더라도 download 속성이 작동할 수 있습니다.
+        link.download = `image-${currentIndex + 1}.jpg`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+    } catch (error) {
+      console.error("이미지 다운로드 실패:", error)
+      window.open(images[currentIndex], "_blank")
+    }
+  }
+
+  // 키보드 이벤트 핸들러
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" && hasPrevious) {
@@ -28,6 +143,15 @@ export function ImageViewer({ images, currentIndex, onClose, onPrevious, onNext 
       } else if (e.key === "Escape") {
         e.preventDefault()
         onClose()
+      } else if (e.key === "+" || e.key === "=") {
+        e.preventDefault()
+        handleZoomIn()
+      } else if (e.key === "-" || e.key === "_") {
+        e.preventDefault()
+        handleZoomOut()
+      } else if (e.key === "0") {
+        e.preventDefault()
+        handleResetZoom()
       }
     }
 
@@ -38,7 +162,11 @@ export function ImageViewer({ images, currentIndex, onClose, onPrevious, onNext 
   }, [hasPrevious, hasNext, onPrevious, onNext, onClose])
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
+    <div 
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       {/* 닫기 버튼 */}
       <Button
         variant="ghost"
@@ -48,6 +176,53 @@ export function ImageViewer({ images, currentIndex, onClose, onPrevious, onNext 
       >
         <X className="w-6 h-6" />
       </Button>
+
+      {/* 다운로드 버튼 */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleDownload}
+        className="absolute top-4 right-16 text-white hover:bg-white/20 z-10"
+        title="다운로드 (D)"
+      >
+        <Download className="w-6 h-6" />
+      </Button>
+
+      {/* 줌 컨트롤 버튼들 */}
+      <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleZoomOut}
+          className="text-white hover:bg-white/20"
+          title="줌 아웃 (-)"
+          disabled={zoom <= MIN_ZOOM}
+        >
+          <ZoomOut className="w-5 h-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleResetZoom}
+          className="text-white hover:bg-white/20"
+          title="줌 리셋 (0)"
+        >
+          <RotateCcw className="w-5 h-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleZoomIn}
+          className="text-white hover:bg-white/20"
+          title="줌 인 (+)"
+          disabled={zoom >= MAX_ZOOM}
+        >
+          <ZoomIn className="w-5 h-5" />
+        </Button>
+        <span className="text-white text-sm px-2">
+          {Math.round(zoom * 100)}%
+        </span>
+      </div>
 
       {/* 이전 버튼 */}
       {hasPrevious && (
@@ -61,12 +236,26 @@ export function ImageViewer({ images, currentIndex, onClose, onPrevious, onNext 
         </Button>
       )}
 
-      {/* 이미지 */}
-      <div className="max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+      {/* 이미지 컨테이너 */}
+      <div 
+        ref={containerRef}
+        className="max-w-[90vw] max-h-[90vh] flex items-center justify-center overflow-hidden"
+        onWheel={handleWheel}
+        onMouseMove={handleMouseMove}
+      >
         <img
+          ref={imageRef}
           src={images[currentIndex]}
           alt={`Image ${currentIndex + 1} of ${images.length}`}
-          className="max-w-full max-h-full object-contain"
+          className="max-w-full max-h-full object-contain select-none"
+          style={{
+            transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+            cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+            transition: isDragging ? "none" : "transform 0.1s ease-out",
+          }}
+          onMouseDown={handleMouseDown}
+          onDoubleClick={handleDoubleClick}
+          draggable={false}
         />
       </div>
 
