@@ -15,12 +15,14 @@ interface Factbook {
   companyName: string
   productName: string
   category: string
-  status: "draft" | "generating" | "completed" | "failed"
+  status: "draft" | "generating" | "completed" | "failed" | "queued"
   createdAt: string
   updatedAt: string
   rawCreatedAt: string
   menuItems: any
   viewCount?: number
+  queuePosition?: number
+  estimatedWaitTime?: number
 }
 
 export function FactbookList() {
@@ -59,6 +61,8 @@ export function FactbookList() {
           updatedAt: item.updated_at ? new Date(item.updated_at).toLocaleDateString("ko-KR") : "",
           rawCreatedAt: item.created_at || "",
           viewCount: 0,
+          queuePosition: item.queue_position,
+          estimatedWaitTime: item.estimated_wait_time,
         }))
 
         setFactbooks(factbooks)
@@ -113,10 +117,13 @@ export function FactbookList() {
 
     const maxSectionTimeSeconds = Math.max(...sectionTimes, 0) + 10 // buffer
     
+    // 대기 시간이 있으면 추가
+    const totalWaitSeconds = maxSectionTimeSeconds + (factbook.estimatedWaitTime || 0)
+    
     // 서버(UTC) 시간을 한국 시간(KST)으로 강제 변환하기 위해 9시간을 더함
     const date = new Date(factbook.rawCreatedAt)
     date.setHours(date.getHours() + 9)
-    date.setSeconds(date.getSeconds() + maxSectionTimeSeconds)
+    date.setSeconds(date.getSeconds() + totalWaitSeconds)
 
     const h = String(date.getHours()).padStart(2, "0")
     const m = String(date.getMinutes()).padStart(2, "0")
@@ -132,7 +139,7 @@ export function FactbookList() {
     if (!factbooks.length) {
       return
     }
-    const hasPending = factbooks.some((fb) => fb.status === "generating" || fb.status === "draft")
+    const hasPending = factbooks.some((fb) => fb.status === "generating" || fb.status === "draft" || fb.status === "queued")
     if (!hasPending) {
       return
     }
@@ -332,7 +339,11 @@ export function FactbookList() {
                   <div className="text-sm text-muted-foreground flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                      <span>{factbook.status === "draft" ? "생성 준비 중..." : "생성 중..."}</span>
+                      <span>
+                        {factbook.status === "draft" 
+                          ? "생성 준비 중..." 
+                          : "생성 중..."}
+                      </span>
                     </div>
                     <div className="text-xs text-blue-600 font-medium ml-6">
                       예상 완료 시간: {calculateEstimatedCompletionTime(factbook) || "--:--"}
@@ -377,7 +388,11 @@ export function FactbookList() {
                     <div className="text-sm text-muted-foreground flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        <span>{factbook.status === "draft" ? "생성 준비 중..." : "생성 중..."}</span>
+                        <span>
+                          {factbook.status === "draft" 
+                            ? "생성 준비 중..." 
+                            : "생성 중..."}
+                        </span>
                       </div>
                       <div className="text-xs text-blue-600 font-medium ml-6">
                         예상 완료: {calculateEstimatedCompletionTime(factbook) || "--:--"}

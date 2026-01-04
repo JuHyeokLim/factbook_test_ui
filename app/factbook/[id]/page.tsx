@@ -2018,7 +2018,7 @@ export default function FactbookDetailPage() {
                 <div>
                   <div className="flex items-center gap-3 mb-8 ml-1">
                     <div className="w-6 h-6 rounded-full bg-[#3b82f6] text-white flex items-center justify-center text-[12px] font-bold shrink-0 shadow-sm">2</div>
-                    <h3 className="text-[20px] font-extrabold text-[#354355]">참고 자료</h3>
+                    <h3 className="text-[20px] font-extrabold text-[#354355]">수집 링크</h3>
                   </div>
                   
                   <div className="space-y-6">
