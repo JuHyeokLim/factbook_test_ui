@@ -307,6 +307,10 @@ interface FactbookDetail {
   productName: string
   category: string
   sections: Section[]
+  analysisItems?: {
+    media?: boolean
+  }
+  referenceLinks?: { title: string; url: string }[]
 }
 
 // <viz>...</viz> 또는 구(旧) [[VISUALIZATION_DATA]] 블록을 파싱
@@ -447,7 +451,7 @@ const sanitizeVisualizationData = (
   return { data: sanitized, invalidRows }
 }
 
-const ChartWrapper = ({ children, title }: { children: React.ReactNode, title: string }) => {
+const ChartWrapper = ({ children, title, viz, sources }: { children: React.ReactNode, title: string, viz?: VisualizationItem, sources?: Source[] }) => {
   const chartRef = useRef<HTMLDivElement>(null)
   const [isHovered, setIsHovered] = useState(false)
 
@@ -517,7 +521,7 @@ const ChartWrapper = ({ children, title }: { children: React.ReactNode, title: s
   }
 
   return (
-    <Card className="relative border border-slate-200 shadow-sm rounded-xl p-6 bg-white overflow-visible group"
+    <div className="relative border border-slate-200 shadow-sm rounded-xl p-6 bg-white overflow-visible group mb-6 my-6"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}>
       <div className={`absolute top-4 right-4 z-10 flex gap-2 transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
@@ -538,13 +542,60 @@ const ChartWrapper = ({ children, title }: { children: React.ReactNode, title: s
           <TooltipContent side="top" className="text-[10px] px-2 py-1">SVG 다운로드</TooltipContent>
         </Tooltip>
       </div>
-      <div ref={chartRef} className="bg-white">
+      <div ref={chartRef} className="bg-white chart-tooltip-container">
         <div className="flex justify-center mb-4">
           <Title className="text-lg font-bold text-[#4D5D71]">{title}</Title>
         </div>
         {children}
+        
+        {/* 차트 하단 출처 표시 */}
+        {viz && sources && sources.length > 0 && (() => {
+          // viz.data에서 모든 _출처 필드를 찾아서 출처 번호 추출
+          const sourceNumbers = new Set<number>()
+          if (viz.data && Array.isArray(viz.data)) {
+            viz.data.forEach((row: any) => {
+              Object.keys(row).forEach(key => {
+                if (key.endsWith('_출처')) {
+                  const matches = String(row[key]).match(/\[(\d+)\]/g)
+                  if (matches) {
+                    matches.forEach(match => {
+                      const num = parseInt(match.replace(/[\[\]]/g, ""), 10)
+                      if (num > 0 && num <= sources.length) {
+                        sourceNumbers.add(num)
+                      }
+                    })
+                  }
+                }
+              })
+            })
+          }
+          
+          const uniqueSources = Array.from(sourceNumbers).sort((a, b) => a - b).map(num => sources[num - 1]).filter(Boolean)
+          
+          if (uniqueSources.length === 0) return null
+          
+          return (
+            <div className="mt-6 pt-4 border-t border-slate-200">
+              <p className="text-xs font-semibold text-slate-600 mb-2">참고 출처</p>
+              <div className="space-y-1">
+                {uniqueSources.map((source, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-xs">
+                    <span className="text-slate-400 shrink-0">[{Array.from(sourceNumbers).sort((a, b) => a - b)[idx]}]</span>
+                    {source.url ? (
+                      <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex-1 truncate" title={source.title}>
+                        {source.title || source.url}
+                      </a>
+                    ) : (
+                      <span className="text-slate-600 flex-1 truncate">{source.title}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -569,28 +620,13 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
       const categoryValue = data[chartIndex]
       const measureKey = chartCategories[0]
       const measureValue = data[measureKey]
-      const sourceField = `${measureKey}_출처`
-      const sourceText = data[sourceField] || ""
-      const sourceNumbers = sourceText.match(/\[(\d+)\]/g)
-      const sourceLinks = sourceNumbers?.map((match: string) => {
-        const num = parseInt(match.replace(/[\[\]]/g, ""), 10)
-        return sources?.[num - 1]
-      }).filter(Boolean)
       return (
         <div className="bg-white border border-slate-300 rounded-lg shadow-lg p-3 max-w-xs">
           <p className="font-semibold text-slate-900 mb-2 text-sm">{categoryValue}</p>
-          <div className="flex items-baseline gap-1.5 mb-2">
+          <div className="flex items-baseline gap-1.5">
             <span className="text-slate-700 text-xs">{measureKey}:</span>
             <span className="font-semibold text-slate-900 text-sm">{numberFormatter(measureValue)}</span>
-            {sourceText && <span className="text-blue-600 text-xs">{sourceText}</span>}
           </div>
-          {sourceLinks && sourceLinks.length > 0 && (
-            <div className="text-xs text-slate-500 space-y-0.5">
-              {sourceLinks.map((source: Source, sIdx: number) => (
-                <a key={sIdx} href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline block truncate" title={source.title}>{source.title || source.url}</a>
-              ))}
-            </div>
-          )}
         </div>
       )
     }
@@ -601,13 +637,6 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
           {payload.map((entry: any, idx: number) => {
             const categoryName = entry.name
             const categoryValue = entry.value
-            const sourceField = `${categoryName}_출처`
-            const sourceText = data[sourceField] || ""
-            const sourceNumbers = sourceText.match(/\[(\d+)\]/g)
-            const sourceLinks = sourceNumbers?.map((match: string) => {
-              const num = parseInt(match.replace(/[\[\]]/g, ""), 10)
-              return sources?.[num - 1]
-            }).filter(Boolean)
             return (
               <div key={idx} className="flex items-start gap-2">
                 <div className="w-3 h-3 rounded-sm mt-0.5 flex-shrink-0" style={{ backgroundColor: entry.color }} />
@@ -615,15 +644,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-slate-700 text-xs">{categoryName}:</span>
                     <span className="font-semibold text-slate-900 text-sm">{numberFormatter(categoryValue)}</span>
-                    {sourceText && <span className="text-blue-600 text-xs">{sourceText}</span>}
                   </div>
-                  {sourceLinks && sourceLinks.length > 0 && (
-                    <div className="mt-1 text-xs text-slate-500">
-                      {sourceLinks.map((source: Source, sIdx: number) => (
-                        <a key={sIdx} href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline block truncate" title={source.title}>{source.title || source.url}</a>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             )
@@ -634,9 +655,9 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
   }
 
   const renderFallback = (message: string) => (
-    <Card className="border-slate-200 shadow-none">
+    <div className="border border-slate-200 shadow-sm rounded-xl p-6 bg-white mb-6 my-6">
       <Text className="text-xs text-slate-500">{message}</Text>
-    </Card>
+    </div>
   )
   if (!data || data.length === 0) return renderFallback("시각화 데이터가 없어 차트를 표시할 수 없습니다.")
   if (validationError) return renderFallback(`시각화 데이터 오류: ${validationError}`)
@@ -654,7 +675,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
       : chartColors
 
     return (
-      <ChartWrapper title={chartTitle}>
+      <ChartWrapper title={chartTitle} viz={viz} sources={sources}>
         <div className="flex justify-center mb-6">
           <Legend 
             categories={donutLegendCategories} 
@@ -695,7 +716,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
   switch (component) {
     case "BarChart": 
       return (
-        <ChartWrapper title={chartTitle}>
+        <ChartWrapper title={chartTitle} viz={viz} sources={sources}>
           <div className="flex justify-end mb-4">
             <Legend 
               categories={chartCategories} 
@@ -710,7 +731,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
       )
     case "LineChart": 
       return (
-        <ChartWrapper title={chartTitle}>
+        <ChartWrapper title={chartTitle} viz={viz} sources={sources}>
           <div className="flex justify-end mb-4">
             <Legend 
               categories={chartCategories} 
@@ -725,7 +746,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
       )
     case "AreaChart": 
       return (
-        <ChartWrapper title={chartTitle}>
+        <ChartWrapper title={chartTitle} viz={viz} sources={sources}>
           <div className="flex justify-end mb-4">
             <Legend 
               categories={chartCategories} 
@@ -1173,6 +1194,7 @@ export default function FactbookDetailPage() {
           companyName: data.company_name || "",
           productName: data.product_name || "",
           category: data.category || "",
+          analysisItems: data.analysis_items || { media: false },
           sections: (data.sections || []).map((section: any) => {
             // 백엔드 데이터 키값 확인 (sub_sections 우선 체크)
             const rawSubSections = section.subSections || section.sub_sections || [];
@@ -1663,6 +1685,11 @@ export default function FactbookDetailPage() {
   }
 
   const handleSubSectionClick = (subSectionId: string) => {
+    // 탭이 팩트북이 아니면 팩트북으로 전환
+    if (activeTab !== "factbook") {
+      setActiveTab("factbook")
+    }
+
     setActiveSection(subSectionId)
     // 섹션 변경 시 이미지 뷰어 닫기
     setSelectedImageIndex(null)
@@ -1676,6 +1703,11 @@ export default function FactbookDetailPage() {
   }
 
   const handleSectionClick = (sectionId: string) => {
+    // 탭이 팩트북이 아니면 팩트북으로 전환
+    if (activeTab !== "factbook") {
+      setActiveTab("factbook")
+    }
+
     const section = factbook?.sections.find((s) => s.id === sectionId)
     if (!section) return
 
@@ -1749,8 +1781,9 @@ export default function FactbookDetailPage() {
                   </Button>
                 </Link>
 
-                <h1 className="text-base text-l font-bold text-[#475569]">
-                  {factbook.companyName} {factbook.productName} FactBook
+                <h1 className="text-base text-[#475569] flex items-baseline gap-1.5">
+                  <span className="font-bold">{factbook.companyName}</span>
+                  <span className="text-[14px] font-medium text-slate-500">{factbook.productName}</span>
                 </h1>
               </div>
 
@@ -1815,8 +1848,8 @@ export default function FactbookDetailPage() {
         </header>
 
       <div className="flex h-[calc(100vh-65px)] overflow-hidden">
-        {/* 팩트북 탭일 때만 목차 사이드바 표시 */}
-        {activeTab === "factbook" && (
+        {/* 목차 사이드바 표시 (모든 탭에서 유지) */}
+        {factbook && (
           <aside className="w-72 border-r border-slate-200 bg-[#f8fafc] flex flex-col flex-shrink-0 overflow-hidden">
             {/* 상단 목차 영역 */}
             <div className="flex-1 overflow-y-auto p-6">
@@ -1896,6 +1929,28 @@ export default function FactbookDetailPage() {
                   )
                 })}
               </Accordion>
+
+              {/* 매체 소재 분석 섹션 (항상 표시) */}
+              <div className="mt-2 border-t border-slate-200 pt-2">
+                <button
+                  onClick={() => {
+                    setActiveTab("media")
+                    setExpandedSection(undefined) // 다른 섹션 닫기
+                  }}
+                  className={`w-full flex items-center gap-3 text-left py-3 px-4 rounded-xl transition-all duration-200 ${
+                    activeTab === "media"
+                      ? "bg-white shadow-sm ring-1 ring-slate-200 text-[#1e293b]"
+                      : "text-[#64748b] hover:bg-white/50"
+                  }`}
+                >
+                  <span className={`${activeTab === "media" ? "text-[#3b82f6]" : "text-[#94a3b8]"}`}>
+                    <Tv className="w-5 h-5" />
+                  </span>
+                  <span className={`text-[14px] font-bold ${activeTab === "media" ? "text-[#1e293b]" : ""}`}>
+                    매체 소재 분석
+                  </span>
+                </button>
+              </div>
             </div>
 
             {/* 하단 메타 정보 영역 */}
@@ -2000,28 +2055,45 @@ export default function FactbookDetailPage() {
                 ))}
               </div>
             ) : activeTab === "links" ? (
-              <div className="max-w-5xl mx-auto px-12">
+              <div className="max-w-6xl mx-auto px-12">
                 <h2 className="text-2xl font-bold text-[#4D5D71] mb-10">링크</h2>
                 
-                {/* 참고 링크 Section */}
-                <div className="mb-6">
-                  <div className="flex items-center gap-3 mb-3 ml-1">
-                    <div className="w-5 h-5 rounded-full bg-[#3b82f6] text-white flex items-center justify-center text-[11px] font-bold shrink-0">1</div>
-                    <h3 className="text-[18px] font-extrabold text-[#354355]">참고 링크</h3>
+                {/* 1. 참고 링크 Section (데이터가 있을 때만 노출) */}
+                {factbook.referenceLinks && factbook.referenceLinks.length > 0 && (
+                  <div className="mb-12">
+                    <div className="flex items-center gap-3 mb-6 ml-1">
+                      <h3 className="text-[20px] font-extrabold text-[#354355]">참고 링크</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {factbook.referenceLinks.map((link, idx) => (
+                        <a 
+                          key={idx}
+                          href={link.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all hover:shadow-sm"
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                            <Link2 className="w-5 h-5 text-slate-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[15px] font-bold text-slate-800 truncate">{link.title || "참고 링크"}</h4>
+                            <span className="text-[11px] text-slate-400 truncate">{link.url}</span>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-slate-300" />
+                        </a>
+                      ))}
+                    </div>
                   </div>
-                  <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-10 text-center">
-                    <p className="text-slate-500 text-sm font-medium">등록된 참고 링크가 없습니다.</p>
-                  </div>
-                </div>
+                )}
 
-                {/* 참고 자료 Section */}
+                {/* 2. 수집 링크 Section */}
                 <div>
                   <div className="flex items-center gap-3 mb-8 ml-1">
-                    <div className="w-6 h-6 rounded-full bg-[#3b82f6] text-white flex items-center justify-center text-[12px] font-bold shrink-0 shadow-sm">2</div>
                     <h3 className="text-[20px] font-extrabold text-[#354355]">수집 링크</h3>
                   </div>
                   
-                  <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {allSources.length > 0 ? (
                       allSources.map((source, idx) => {
                         const getDomainFromUrl = (url: string) => {
@@ -2034,61 +2106,35 @@ export default function FactbookDetailPage() {
                         const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : null
 
                         return (
-                          <div key={idx} className="group flex items-start gap-8 py-6 border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors rounded-xl px-4 -mx-4">
-                            <div className="flex-1 min-w-0">
-                              {/* 출처 정보 및 도메인 */}
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                                  {faviconUrl ? (
-                                    <img src={faviconUrl} alt="" className="w-4 h-4" onError={(e) => e.currentTarget.style.display = 'none'} />
-                                  ) : (
-                                    <Globe className="w-3 h-3 text-slate-400" />
-                                  )}
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-[13px] font-medium text-slate-700 truncate">{domain || "Unknown Source"}</span>
-                                  <span className="text-[11px] text-slate-400 truncate">{source.url}</span>
-                                </div>
-                              </div>
-                              
-                              {/* 제목 */}
-                              <a 
-                                href={source.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="block mb-2"
-                              >
-                                <h4 className="text-[19px] font-bold text-[#1a0dab] group-hover:underline leading-snug line-clamp-2">
-                                  {source.title || "제목 없음"}
-                                </h4>
-                              </a>
-                              
-                              {/* 내용 초록 */}
-                              <p className="text-[14px] text-slate-600 leading-relaxed line-clamp-3">
-                                {source.content}
-                              </p>
+                          <a 
+                            key={idx}
+                            href={source.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all hover:shadow-sm"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 group-hover:bg-white">
+                              {faviconUrl ? (
+                                <img src={faviconUrl} alt="" className="w-5 h-5" onError={(e) => e.currentTarget.style.display = 'none'} />
+                              ) : (
+                                <Globe className="w-4 h-4 text-slate-400" />
+                              )}
                             </div>
 
-                            {/* 우측 썸네일 이미지 */}
-                            <div className="shrink-0">
-                              <div 
-                                className="w-[120px] h-[120px] rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-all group-hover:border-slate-300"
-                                onClick={() => source.imageUrl && handleImageClick(source.imageUrl)}
-                              >
-                                {source.imageUrl ? (
-                                  <img src={source.imageUrl} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-slate-300 italic text-[10px]">
-                                    <ImageIcon className="w-8 h-8 opacity-20" />
-                                  </div>
-                                )}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-[15px] font-bold text-slate-800 group-hover:text-[#1a0dab] truncate mb-0.5">
+                                {source.title || "제목 없음"}
+                              </h4>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-medium text-slate-400 truncate">{domain}</span>
                               </div>
                             </div>
-                          </div>
+                            <ExternalLink className="w-4 h-4 text-slate-300 group-hover:text-slate-400 shrink-0" />
+                          </a>
                         )
                       })
                     ) : (
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
+                      <div className="col-span-full bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
                         <p className="text-slate-500 text-sm">수집된 참고 자료가 없습니다.</p>
                       </div>
                     )}
