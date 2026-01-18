@@ -46,10 +46,10 @@ export function Toast({
 
   return (
     <div
-      className={`fixed bottom-4 right-4 z-50 min-w-[300px] rounded-lg border p-4 shadow-lg transition-all animate-in slide-in-from-bottom-5 ${
+      className={`fixed bottom-4 right-4 z-50 min-w-[300px] max-w-[420px] rounded-xl border p-4 shadow-2xl transition-all animate-in slide-in-from-bottom-5 ${
         variant === "destructive"
-          ? "bg-destructive text-destructive-foreground border-destructive"
-          : "bg-background text-foreground border-border"
+          ? "bg-red-600 text-white border-red-700"
+          : "bg-white text-slate-900 border-slate-200"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -61,7 +61,9 @@ export function Toast({
             setIsVisible(false)
             onOpenChange?.(false)
           }}
-          className="text-foreground/50 hover:text-foreground"
+          className={`hover:opacity-70 transition-opacity ${
+            variant === "destructive" ? "text-white" : "text-slate-400"
+          }`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

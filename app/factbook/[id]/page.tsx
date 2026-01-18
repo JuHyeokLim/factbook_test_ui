@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, ReactNode, createContext, useContext, memo, useCallback, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUp, Copy, Check, Download, FileSearch, Folder, Link2, Image as ImageIcon, Search, Building2, Globe, Star, Target, Tv, ExternalLink, ZoomIn, ZoomOut, RotateCcw } from "lucide-react"
+import { ArrowLeft, ArrowUp, Copy, Check, Download, FileSearch, Folder, Link2, Image as ImageIcon, Search, Building2, Globe, Star, Target, Tv, ExternalLink, ZoomIn, ZoomOut, RotateCcw, FileText, FilePieChart, FileSpreadsheet } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { MediaTab } from "@/components/factbook/media-tab"
@@ -19,12 +19,39 @@ import { AreaChart, BarChart, Card, DonutChart, LineChart, Text, Title, Legend }
 import { exportFactbookToWord } from "@/lib/exportUtils"
 import { toPng, toSvg } from 'html-to-image'
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+
 interface Source {
   title: string
   content: string
   media: string
   url?: string
   imageUrl?: string
+}
+
+interface ProductServiceItem {
+  id: string
+  product_name: string
+  competitors: string[]
+  proposals: string[]
+  target_customers: string[]
+}
+
+interface ReferenceMaterial {
+  id: string
+  type: "file" | "link" | "text"
+  name: string
+  url?: string
+  content?: string
+  file_size?: number
+  content_type?: string
 }
 
 // 출처 정보 전달을 위한 Context
@@ -311,6 +338,8 @@ interface FactbookDetail {
     media?: boolean
   }
   referenceLinks?: { title: string; url: string }[]
+  items: ProductServiceItem[]
+  references: ReferenceMaterial[]
 }
 
 // <viz>...</viz> 또는 구(旧) [[VISUALIZATION_DATA]] 블록을 파싱
@@ -680,7 +709,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
           <Legend 
             categories={donutLegendCategories} 
             colors={chartColors} 
-            className="flex-wrap justify-center gap-x-6 gap-y-3 [&_p]:ml-1"
+            className="flex-wrap justify-center gap-x-6 gap-y-3"
             activeLegend={activeCategory}
             onClickLegendItem={handleLegendClick}
           />
@@ -721,7 +750,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
             <Legend 
               categories={chartCategories} 
               colors={chartColors} 
-              className="flex-wrap justify-end gap-x-6 gap-y-3 [&_p]:ml-1"
+              className="flex-wrap justify-end gap-x-6 gap-y-3"
               activeLegend={activeCategory}
               onClickLegendItem={handleLegendClick}
             />
@@ -736,7 +765,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
             <Legend 
               categories={chartCategories} 
               colors={chartColors} 
-              className="flex-wrap justify-end gap-x-6 gap-y-3 [&_p]:ml-1"
+              className="flex-wrap justify-end gap-x-6 gap-y-3"
               activeLegend={activeCategory}
               onClickLegendItem={handleLegendClick}
             />
@@ -751,7 +780,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
             <Legend 
               categories={chartCategories} 
               colors={chartColors} 
-              className="flex-wrap justify-end gap-x-6 gap-y-3 [&_p]:ml-1"
+              className="flex-wrap justify-end gap-x-6 gap-y-3"
               activeLegend={activeCategory}
               onClickLegendItem={handleLegendClick}
             />
@@ -1166,6 +1195,7 @@ export default function FactbookDetailPage() {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set()) // 로드 실패한 이미지 URL 저장
   const [isManualScroll, setIsManualScroll] = useState(false) // 수동 스크롤 여부
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isInputInfoOpen, setIsInputInfoOpen] = useState(false)
   const mainContentRef = useRef<HTMLDivElement>(null) // 메인 콘텐츠 스크롤 컨테이너 ref
   const { toast } = useToast()
 
@@ -1195,6 +1225,22 @@ export default function FactbookDetailPage() {
           productName: data.product_name || "",
           category: data.category || "",
           analysisItems: data.analysis_items || { media: false },
+          items: (data.items || []).map((item: any) => ({
+            id: String(item.id),
+            product_name: item.product_name || "",
+            competitors: item.competitors || [],
+            proposals: item.proposals || [],
+            target_customers: item.target_customers || [],
+          })),
+          references: (data.references || []).map((ref: any) => ({
+            id: String(ref.id),
+            type: ref.type,
+            name: ref.name || "",
+            url: ref.url || "",
+            content: ref.content || "",
+            file_size: ref.file_size,
+            content_type: ref.content_type,
+          })),
           sections: (data.sections || []).map((section: any) => {
             // 백엔드 데이터 키값 확인 (sub_sections 우선 체크)
             const rawSubSections = section.subSections || section.sub_sections || [];
@@ -1977,10 +2023,13 @@ export default function FactbookDetailPage() {
                         {new Date().toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')}
                       </td>
                     </tr>
-                    <tr className="py-1">
+                    <tr 
+                      className="py-1 cursor-pointer hover:bg-slate-50 transition-colors group/row"
+                      onClick={() => setIsInputInfoOpen(true)}
+                    >
                       <td className="text-[#94a3b8] py-1 w-16 font-medium">입력 정보</td>
                       <td className="text-[#475569] py-1 font-semibold text-right flex justify-end">
-                        <div className="w-4 h-4 rounded bg-[#e2e8f0] flex items-center justify-center text-[#94a3b8]">
+                        <div className="w-4 h-4 rounded bg-[#e2e8f0] flex items-center justify-center text-[#94a3b8] group-hover/row:bg-blue-100 group-hover/row:text-blue-600 transition-colors">
                           <ExternalLink className="w-2.5 h-2.5" />
                         </div>
                       </td>
@@ -2083,6 +2132,123 @@ export default function FactbookDetailPage() {
                           <ExternalLink className="w-4 h-4 text-slate-300" />
                         </a>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 1.5. 참고 자료 Section (사용자가 업로드한 파일/링크/텍스트) */}
+                {factbook.references && factbook.references.length > 0 && (
+                  <div className="mb-12">
+                    <div className="flex items-center gap-2 mb-6 ml-1">
+                      {/* <div className="w-1.5 h-5 bg-blue-500 rounded-full" /> */}
+                      <h3 className="text-[20px] font-extrabold text-[#354355]">참고 자료</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {factbook.references.map((ref) => {
+                        // 확장자별 아이콘 및 라벨 설정
+                        const getFileInfo = (name: string, type: string) => {
+                          if (type === "link") {
+                            return { icon: Link2, bg: "bg-amber-50", text: "text-amber-500", label: "링크" }
+                          }
+                          if (type === "text") {
+                            return { icon: FileText, bg: "bg-emerald-50", text: "text-emerald-500", label: "텍스트" }
+                          }
+                          
+                          // 파일 타입: 확장자로 판별
+                          const ext = name?.split('.').pop()?.toLowerCase()
+                          switch(ext) {
+                            case 'pdf':
+                              return { icon: FileText, bg: "bg-red-50", text: "text-red-500", label: "PDF" }
+                            case 'ppt':
+                            case 'pptx':
+                              return { icon: FileText, bg: "bg-orange-50", text: "text-orange-500", label: "PPT" }
+                            case 'doc':
+                            case 'docx':
+                              return { icon: FileText, bg: "bg-blue-50", text: "text-blue-500", label: "Word" }
+                            case 'xls':
+                            case 'xlsx':
+                              return { icon: FileText, bg: "bg-green-50", text: "text-green-600", label: "Excel" }
+                            case 'txt':
+                              return { icon: FileText, bg: "bg-slate-100", text: "text-slate-500", label: "기타" }
+                            default:
+                              return { icon: Folder, bg: "bg-slate-100", text: "text-slate-500", label: "파일" }
+                          }
+                        }
+                        
+                        const fileInfo = getFileInfo(ref.name, ref.type)
+                        const IconComponent = fileInfo.icon
+                        
+                        // 다운로드 핸들러
+                        const handleDownload = async (e: React.MouseEvent) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          
+                          if (ref.type === "file" || ref.type === "text") {
+                            try {
+                              const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+                              const response = await fetch(`${backendUrl}/api/references/${ref.id}/download`)
+                              if (!response.ok) throw new Error('다운로드 실패')
+                              
+                              const blob = await response.blob()
+                              const url = window.URL.createObjectURL(blob)
+                              const a = document.createElement('a')
+                              a.href = url
+                              
+                              // 텍스트 타입인 경우 파일명에 .txt 확장자 보장
+                              let downloadName = ref.name
+                              if (ref.type === "text" && !downloadName.toLowerCase().endsWith(".txt")) {
+                                downloadName += ".txt"
+                              }
+                              
+                              a.download = downloadName
+                              document.body.appendChild(a)
+                              a.click()
+                              window.URL.revokeObjectURL(url)
+                              document.body.removeChild(a)
+                            } catch (error) {
+                              console.error('참고 자료 다운로드 실패:', error)
+                              alert('참고 자료 다운로드에 실패했습니다.')
+                            }
+                          } else if (ref.url) {
+                            window.open(ref.url, '_blank')
+                          }
+                        }
+                        
+                        return (
+                          <div 
+                            key={ref.id} 
+                            className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+                          >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${fileInfo.bg} ${fileInfo.text}`}>
+                              <IconComponent className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-[13px] font-bold text-slate-800 truncate" title={ref.name}>{ref.name}</h4>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-slate-200 text-slate-400 font-medium">
+                                  {fileInfo.label}
+                                </Badge>
+                                {ref.file_size && (
+                                  <span className="text-[10px] text-slate-400">{(ref.file_size / 1024).toFixed(1)} KB</span>
+                                )}
+                              </div>
+                            </div>
+                            {(ref.type === "file" || ref.type === "text" || ref.url) && (
+                              <button
+                                onClick={handleDownload}
+                                className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-blue-600 transition-all"
+                                title={ref.type === "file" || ref.type === "text" ? "다운로드" : "열기"}
+                              >
+                                {ref.type === "file" || ref.type === "text" ? (
+                                  <Download className="w-4 h-4" />
+                                ) : (
+                                  <ExternalLink className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -2351,6 +2517,256 @@ export default function FactbookDetailPage() {
           onNext={handleNextImage}
         />
       )}
+
+      {/* 입력 정보 상세 모달 */}
+      <Dialog open={isInputInfoOpen} onOpenChange={setIsInputInfoOpen}>
+        <DialogContent className="w-[80vw] !max-w-[1200px] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 border-none rounded-3xl shadow-2xl">
+          <DialogHeader className="px-10 py-7 bg-[#f8fafc] border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1.5">
+                <DialogTitle className="text-2xl font-bold text-slate-900 tracking-tight">상세 입력 정보</DialogTitle>
+                <p className="text-[14px] text-slate-500 font-medium">팩트북 생성을 위해 사용자가 입력한 정보입니다.</p>
+              </div>
+              {/* <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsInputInfoOpen(false)}
+                className="rounded-full hover:bg-slate-200/50"
+              >
+                <ArrowUp className="w-5 h-5 rotate-180" />
+              </Button> */}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+            <div className="p-8 space-y-10">
+              {/* 기본 정보 */}
+              <section className="space-y-5">
+                <div className="flex items-center gap-2.5 mb-1">
+                  <div className="w-1 h-4 bg-blue-600 rounded-full" />
+                  <h3 className="text-[17px] font-bold text-slate-900">기본 정보</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-slate-50/80 rounded-xl p-6 border border-slate-100">
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold text-slate-400 uppercase tracking-wide">기업명</label>
+                    <div className="bg-white px-4 py-2.5 rounded-lg border border-slate-200/60 text-[14px] font-bold text-slate-900 shadow-sm">
+                      {factbook.companyName}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold text-slate-400 uppercase tracking-wide">업종 카테고리</label>
+                    <div className="bg-white px-4 py-2.5 rounded-lg border border-slate-200/60 text-[14px] font-bold text-slate-900 shadow-sm">
+                      {factbook.category || "기타"}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* 제품/서비스 정보 */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-2.5 mb-1">
+                  <div className="w-1 h-4 bg-blue-600 rounded-full" />
+                  <h3 className="text-[17px] font-bold text-slate-900">제품/서비스 및 제안 요청</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-5">
+                  {factbook.items && factbook.items.length > 0 ? (
+                    factbook.items.map((item, idx) => (
+                      <div key={item.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div className="bg-slate-50/60 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                          <span className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">Item #{idx + 1}</span>
+                        </div>
+                        <div className="p-6 space-y-6">
+                          <div className="space-y-2">
+                            <label className="text-[12px] font-bold text-slate-400 uppercase tracking-wide ml-0.5">제품/서비스명</label>
+                            <p className="text-[14px] font-bold text-slate-900 bg-blue-50/30 px-3 py-1.5 rounded-lg border border-blue-100/50 inline-block">{item.product_name || "-"}</p>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-1">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 text-slate-500">
+                                <div className="w-3 h-3 border-l-2 border-b-2 border-slate-200 rounded-bl-[4px]" />
+                                <label className="text-[13px] font-bold">경쟁사</label>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.competitors && item.competitors.length > 0 ? (
+                                  item.competitors.map((c, i) => (
+                                    <Badge key={i} variant="secondary" className="bg-white border border-slate-100 text-slate-600 px-2.5 py-1 text-[11px] font-semibold rounded-lg">
+                                      {c}
+                                    </Badge>
+                                  ))
+                                ) : <span className="text-slate-300 text-xs italic">정보 없음</span>}
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 text-slate-500">
+                                <div className="w-3 h-3 border-l-2 border-b-2 border-slate-200 rounded-bl-[4px]" />
+                                <label className="text-[13px] font-bold">요구사항(제안)</label>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.proposals && item.proposals.length > 0 ? (
+                                  item.proposals.map((p, i) => (
+                                    <Badge key={i} variant="secondary" className="bg-white border border-slate-100 text-slate-600 px-2.5 py-1 text-[11px] font-semibold rounded-lg">
+                                      {p}
+                                    </Badge>
+                                  ))
+                                ) : <span className="text-slate-300 text-xs italic">정보 없음</span>}
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 text-slate-500">
+                                <div className="w-3 h-3 border-l-2 border-b-2 border-slate-200 rounded-bl-[4px]" />
+                                <label className="text-[13px] font-bold">타겟 고객</label>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.target_customers && item.target_customers.length > 0 ? (
+                                  item.target_customers.map((t, i) => (
+                                    <Badge key={i} variant="secondary" className="bg-white border border-slate-100 text-slate-600 px-2.5 py-1 text-[11px] font-semibold rounded-lg">
+                                      {t}
+                                    </Badge>
+                                  ))
+                                ) : <span className="text-slate-300 text-xs italic">정보 없음</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      <p className="text-slate-400 text-sm italic">등록된 제품 정보가 없습니다.</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* 참고 자료 */}
+              <section className="space-y-5">
+                <div className="flex items-center gap-2.5 mb-1">
+                  <div className="w-1 h-4 bg-blue-600 rounded-full" />
+                  <h3 className="text-[17px] font-bold text-slate-900">참고 자료</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {factbook.references && factbook.references.length > 0 ? (
+                    factbook.references.map((ref) => {
+                      // 확장자별 아이콘 및 라벨 설정
+                      const getFileInfo = (name: string, type: string) => {
+                        if (type === "link") {
+                          return { icon: Link2, bg: "bg-white", text: "text-slate-600", label: "링크" }
+                        }
+                        if (type === "text") {
+                          return { icon: FileText, bg: "bg-white", text: "text-slate-600", label: "텍스트" }
+                        }
+                        
+                        const ext = name?.split('.').pop()?.toLowerCase()
+                        switch(ext) {
+                          case 'pdf':
+                            return { icon: FileText, bg: "bg-white", text: "text-red-500", label: "PDF" }
+                          case 'ppt':
+                          case 'pptx':
+                            return { icon: FilePieChart, bg: "bg-white", text: "text-orange-500", label: "PPT" }
+                          case 'doc':
+                          case 'docx':
+                            return { icon: FileText, bg: "bg-white", text: "text-blue-500", label: "Word" }
+                          case 'xls':
+                          case 'xlsx':
+                            return { icon: FileSpreadsheet, bg: "bg-white", text: "text-emerald-500", label: "Excel" }
+                          case 'txt':
+                            return { icon: FileText, bg: "bg-white", text: "text-slate-500", label: "기타" }
+                          default:
+                            return { icon: Folder, bg: "bg-white", text: "text-slate-500", label: "파일" }
+                        }
+                      }
+                      
+                      const fileInfo = getFileInfo(ref.name, ref.type)
+                      const IconComponent = fileInfo.icon
+
+                      // 다운로드 핸들러
+                      const handleDownload = async (e: React.MouseEvent) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        
+                        if (ref.type === "file" || ref.type === "text") {
+                          try {
+                            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+                            const response = await fetch(`${backendUrl}/api/references/${ref.id}/download`)
+                            if (!response.ok) throw new Error('다운로드 실패')
+                            
+                            const blob = await response.blob()
+                            const url = window.URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            
+                            // 텍스트 타입인 경우 파일명에 .txt 확장자 보장
+                            let downloadName = ref.name
+                            if (ref.type === "text" && !downloadName.toLowerCase().endsWith(".txt")) {
+                              downloadName += ".txt"
+                            }
+                            
+                            a.download = downloadName
+                            document.body.appendChild(a)
+                            a.click()
+                            window.URL.revokeObjectURL(url)
+                            document.body.removeChild(a)
+                          } catch (error) {
+                            console.error('참고 자료 다운로드 실패:', error)
+                            alert('참고 자료 다운로드에 실패했습니다.')
+                          }
+                        } else if (ref.url) {
+                          window.open(ref.url, '_blank')
+                        }
+                      }
+                      
+                      return (
+                        <div key={ref.id} className="group relative flex items-center gap-4 p-3 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-slate-300 transition-all">
+                          <div className={`w-10 h-10 rounded border border-slate-200 flex items-center justify-center shrink-0 ${fileInfo.bg} ${fileInfo.text}`}>
+                            <IconComponent className="w-6 h-6" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[13px] font-medium text-slate-900 truncate" title={ref.name}>{ref.name}</h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-[10px] font-medium text-slate-500 truncate italic uppercase">{fileInfo.label}</p>
+                              {ref.file_size && (
+                                <span className="text-[10px] text-slate-400">{(ref.file_size / 1024).toFixed(1)} KB</span>
+                              )}
+                            </div>
+                          </div>
+                          {(ref.type === "file" || ref.type === "text" || ref.url) && (
+                            <button
+                              onClick={handleDownload}
+                              className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all rounded-full flex-shrink-0 flex items-center justify-center"
+                              title={ref.type === "file" || ref.type === "text" ? "다운로드" : "열기"}
+                            >
+                              {ref.type === "file" || ref.type === "text" ? (
+                                <Download className="w-4 h-4" />
+                              ) : (
+                                <ExternalLink className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="col-span-full text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      <p className="text-slate-400 text-sm italic">등록된 참고 자료가 없습니다.</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div className="px-10 py-6 bg-[#f8fafc] border-t border-slate-100 flex justify-end shrink-0">
+            <Button onClick={() => setIsInputInfoOpen(false)} className="bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl px-8 h-12 shadow-lg shadow-slate-200 transition-all active:scale-95">
+              확인
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </TooltipProvider>
   )

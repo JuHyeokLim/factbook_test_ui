@@ -10,12 +10,18 @@ import { useToast } from "@/hooks/use-toast"
 interface RfpUploadStepProps {
   onFileSelect?: (file: File) => void
   onExtractedData?: (data: any) => void
+  onUploadStatusChange?: (uploading: boolean) => void
 }
 
-export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepProps) {
+export function RfpUploadStep({ onFileSelect, onExtractedData, onUploadStatusChange }: RfpUploadStepProps) {
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
+  
+  const handleSetUploading = (val: boolean) => {
+    setUploading(val)
+    onUploadStatusChange?.(val)
+  }
   const [uploadProgress, setUploadProgress] = useState(0)
   const { toast } = useToast()
 
@@ -60,7 +66,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
     onFileSelect?.(selectedFile)
 
     // 자동 업로드 시작
-    setUploading(true)
+    handleSetUploading(true)
     setUploadProgress(0)
 
     return new Promise<void>((resolve, reject) => {
@@ -130,6 +136,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
               menu_recommendations: result.menu_recommendations,
               _hasError: hasError,  // 에러 플래그 추가
               _errorInfo: result.error || null,  // 에러 정보 추가
+              _fileName: selectedFile.name, // 파일명 추가
             }
             
             setUploadProgress(100)
@@ -157,14 +164,14 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
               
               // 탭 이동 후 잠시 더 100%를 보여주고 리셋
               setTimeout(() => {
-                setUploading(false)
+                handleSetUploading(false)
                 setUploadProgress(0)
                 resolve()
               }, 800)
             }, 1000)
           } catch (parseError) {
             console.error("Response parse error:", parseError)
-            setUploading(false)
+            handleSetUploading(false)
             setUploadProgress(0)
             reject(new Error("응답 파싱에 실패했습니다."))
           }
@@ -173,7 +180,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
             clearInterval(processingInterval)
             processingInterval = null
           }
-          setUploading(false)
+          handleSetUploading(false)
           setUploadProgress(0)
           try {
             const errorData = JSON.parse(xhr.responseText)
@@ -189,7 +196,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
           clearInterval(processingInterval)
           processingInterval = null
         }
-        setUploading(false)
+        handleSetUploading(false)
         setUploadProgress(0)
         reject(new Error("네트워크 오류가 발생했습니다."))
       })
@@ -199,7 +206,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
           clearInterval(processingInterval)
           processingInterval = null
         }
-        setUploading(false)
+        handleSetUploading(false)
         setUploadProgress(0)
         reject(new Error("업로드가 취소되었습니다."))
       })
@@ -208,7 +215,7 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
       xhr.send(formData)
     }).catch((error) => {
       console.error("Upload error:", error)
-      setUploading(false)
+      handleSetUploading(false)
       setUploadProgress(0)
       const errorMessage = error instanceof Error ? error.message : "파일 업로드 중 오류가 발생했습니다."
       toast({
@@ -235,33 +242,46 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
           dragActive ? "border-primary bg-primary/5" : "border-muted"
-        } ${uploading ? "opacity-50 pointer-events-none" : ""}`}
+        } ${uploading ? "pointer-events-none" : ""}`}
       >
         {uploading ? (
-          <div className="space-y-4">
-            <Loader2 className="w-10 h-10 text-primary mx-auto animate-spin" />
-            <p className="font-medium">
-              {uploadProgress < 70 
-                ? "파일 업로드 중..." 
-                : uploadProgress < 100 
-                ? "AI 분석 및 메뉴 추천 중..." 
-                : "처리 완료"}
-            </p>
-            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-              <div 
-                className="h-full bg-primary transition-all duration-300"
-                style={{ width: `${Math.min(uploadProgress, 100)}%` }}
-              />
+          <div className="space-y-5 py-2">
+            <div className="relative w-12 h-12 mx-auto">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <Loader2 className="relative w-12 h-12 text-primary animate-spin" />
             </div>
-            <p className="text-sm text-muted-foreground">{Math.round(Math.min(uploadProgress, 100))}%</p>
+            <div className="space-y-2">
+              <p className="text-[13px] font-bold text-slate-800 tracking-tight">
+                {uploadProgress < 70 
+                  ? "파일을 업로드하고 있습니다" 
+                  : uploadProgress < 100 
+                  ? "AI가 정보를 추출하고 있습니다" 
+                  : "분석이 완료되었습니다"}
+              </p>
+              <p className="text-[11px] text-slate-400 font-medium">잠시만 기다려 주세요...</p>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner border border-slate-200/50">
+              <div 
+                className="h-full bg-primary relative transition-all duration-500 ease-out shadow-[0_0_12px_rgba(var(--primary),0.4)]"
+                style={{ width: `${Math.min(uploadProgress, 100)}%` }}
+              >
+                {/* 움직이는 빛 효과 */}
+                <div className="absolute inset-0 w-full h-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)] -translate-x-full animate-[shimmer_2s_infinite]" />
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[11px] font-bold text-primary animate-pulse">
+                {Math.round(Math.min(uploadProgress, 100))}%
+              </span>
+            </div>
           </div>
         ) : file ? (
           <div className="space-y-2">
             <div className="flex items-center justify-center gap-2">
               <Upload className="w-5 h-5 text-primary" />
-              <span className="font-medium">{file.name}</span>
+              <span className="text-sm font-semibold">{file.name}</span>
             </div>
-            <div className="text-sm text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)}MB</div>
+            <div className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)}MB</div>
             <Button variant="ghost" size="sm" onClick={() => setFile(null)} className="gap-1">
               <X className="w-4 h-4" />
               삭제
@@ -271,11 +291,11 @@ export function RfpUploadStep({ onFileSelect, onExtractedData }: RfpUploadStepPr
           <div className="space-y-3">
             <Upload className="w-10 h-10 text-muted-foreground mx-auto" />
             <div>
-              <p className="font-medium">RFP를 여기에 끌어다놓으세요</p>
-              <p className="text-sm text-muted-foreground">또는 파일을 선택하세요 (10MB 이하의 pdf, pptx, docx)</p>
+              <p className="text-sm font-semibold">RFP를 여기에 끌어다놓으세요</p>
+              <p className="text-[11px] text-muted-foreground">또는 파일을 선택하세요 (10MB 이하의 pdf, pptx, docx)</p>
             </div>
             <label>
-              <Button variant="outline" asChild>
+              <Button variant="outline" asChild size="sm" className="h-8 text-xs px-4 rounded-lg">
                 <span>파일 선택</span>
               </Button>
               <input type="file" hidden accept=".pdf,.pptx,.docx" onChange={handleFileInput} />

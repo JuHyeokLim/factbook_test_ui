@@ -22,6 +22,7 @@ interface CompanySearchInputProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  showLabel?: boolean
 }
 
 // 기업 목록 캐싱 (전역)
@@ -126,6 +127,7 @@ export function CompanySearchInput({
   value,
   onChange,
   placeholder = "기업명을 입력하세요",
+  showLabel = true,
 }: CompanySearchInputProps) {
   const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState(value)
@@ -243,28 +245,30 @@ export function CompanySearchInput({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-medium">기업명</label>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-sm">
-              <div className="space-y-2">
-                <p className="font-semibold">DART 등록 기업 검색</p>
-                <p className="text-sm">
-                  입력하시면 DART에 등록된 기업명 후보가 표시됩니다.
-                </p>
-                <div className="border-t pt-2 space-y-1 text-xs">
-                  <p>• <span className="font-medium">DART 등록 기업:</span> 재무제표 등 공식 데이터 제공</p>
-                  <p>• <span className="font-medium">미등록 기업:</span> 일반 검색 데이터 사용 (입력 가능)</p>
+      {showLabel && (
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-bold">기업명 <span className="text-red-600">*</span></label>
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-4 w-4 text-muted-foreground font-medium cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm">
+                <div className="space-y-2">
+                  <p className="font-semibold">DART 등록 기업 검색</p>
+                  <p className="text-sm">
+                    입력하시면 DART에 등록된 기업명 후보가 표시됩니다.
+                  </p>
+                  <div className="border-t pt-2 space-y-1 text-xs">
+                    <p>• <span className="font-medium">DART 등록 기업:</span> 재무제표 등 공식 데이터 제공</p>
+                    <p>• <span className="font-medium">미등록 기업:</span> 일반 검색 데이터 사용 (입력 가능)</p>
+                  </div>
                 </div>
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
 
       <div className="relative">
         <Input

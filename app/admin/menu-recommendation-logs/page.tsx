@@ -17,7 +17,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Loader2, Search, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Loader2, Search, AlertCircle, CheckCircle2, FileText, LayoutList } from "lucide-react"
 
 // 간단한 컴포넌트들
 const Badge = ({ children, variant, className }: any) => {
@@ -57,59 +58,112 @@ interface MenuRecommendationLog {
   created_at: string
 }
 
+interface RFPExtractionLog {
+  id: number
+  rfp_text: string
+  prompt: string
+  api_params: any
+  response_content: string | null
+  extracted_data: {
+    company_name?: string
+    category?: string
+    items?: any[]
+    requires_media_analysis?: boolean
+  } | null
+  error_message: string | null
+  error_type: string | null
+  created_at: string
+}
+
 export default function MenuRecommendationLogsPage() {
-  const [logs, setLogs] = useState<MenuRecommendationLog[]>([])
+  const [menuLogs, setMenuLogs] = useState<MenuRecommendationLog[]>([])
+  const [rfpLogs, setRfpLogs] = useState<RFPExtractionLog[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedLog, setSelectedLog] = useState<MenuRecommendationLog | null>(null)
+  const [selectedMenuLog, setSelectedMenuLog] = useState<MenuRecommendationLog | null>(null)
+  const [selectedRfpLog, setSelectedRfpLog] = useState<RFPExtractionLog | null>(null)
+  const [mainTab, setMainTab] = useState("menu-recommendation")
   const [activeTab, setActiveTab] = useState("prompt")
   const [filters, setFilters] = useState({
     factbook_id: "",
     company_name: "",
   })
-  const [totalCount, setTotalCount] = useState(0)
+  const [totalMenuCount, setTotalMenuCount] = useState(0)
+  const [totalRfpCount, setTotalRfpCount] = useState(0)
 
-  const fetchLogs = async () => {
+  const fetchMenuLogs = async () => {
     setLoading(true)
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
       const params = new URLSearchParams()
-      // 필터는 선택사항으로만 사용 (기본값은 전체 조회)
       if (filters.factbook_id && filters.factbook_id.trim()) {
         params.append("factbook_id", filters.factbook_id.trim())
       }
       if (filters.company_name && filters.company_name.trim()) {
         params.append("company_name", filters.company_name.trim())
       }
-      params.append("limit", "200")  // 더 많은 로그 표시
+      params.append("limit", "200")
       params.append("offset", "0")
 
       const response = await fetch(
         `${backendUrl}/api/admin/menu-recommendation-logs?${params.toString()}`
       )
       if (!response.ok) {
-        throw new Error("로그 조회 실패")
+        throw new Error("메뉴 추천 로그 조회 실패")
       }
 
       const data = await response.json()
-      setLogs(data.logs || [])
-      setTotalCount(data.total_count || 0)
+      setMenuLogs(data.logs || [])
+      setTotalMenuCount(data.total_count || 0)
     } catch (error) {
-      console.error("로그 조회 실패:", error)
+      console.error("메뉴 추천 로그 조회 실패:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchRfpLogs = async () => {
+    setLoading(true)
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+      const params = new URLSearchParams()
+      params.append("limit", "200")
+      params.append("offset", "0")
+
+      const response = await fetch(
+        `${backendUrl}/api/admin/rfp-extraction-logs?${params.toString()}`
+      )
+      if (!response.ok) {
+        throw new Error("RFP 추출 로그 조회 실패")
+      }
+
+      const data = await response.json()
+      setRfpLogs(data.logs || [])
+      setTotalRfpCount(data.total_count || 0)
+    } catch (error) {
+      console.error("RFP 추출 로그 조회 실패:", error)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchLogs()
-  }, [])
+    if (mainTab === "menu-recommendation") {
+      fetchMenuLogs()
+    } else {
+      fetchRfpLogs()
+    }
+  }, [mainTab])
+
+  const handleSearch = () => {
+    if (mainTab === "menu-recommendation") {
+      fetchMenuLogs()
+    } else {
+      fetchRfpLogs()
+    }
+  }
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const handleSearch = () => {
-    fetchLogs()
   }
 
   const formatDate = (dateString: string) => {
@@ -122,327 +176,398 @@ export default function MenuRecommendationLogsPage() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">메뉴 추천 로그</h1>
+          <h1 className="text-3xl font-bold">AI 분석 로그</h1>
           <p className="text-muted-foreground mt-2">
-            Gemini API를 통한 메뉴 항목 추천 로그를 확인할 수 있습니다.
+            Gemini API를 통한 정보 추출 및 메뉴 추천 로그를 확인할 수 있습니다.
           </p>
         </div>
       </div>
 
-      {/* 필터 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>필터 (선택사항)</CardTitle>
-          <CardDescription>
-            필터 없이 조회하면 전체 로그가 표시됩니다.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">팩트북 ID (선택)</label>
-              <Input
-                placeholder="팩트북 ID로 필터링 (선택사항)"
-                value={filters.factbook_id}
-                onChange={(e) => handleFilterChange("factbook_id", e.target.value)}
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">회사명 (선택)</label>
-              <Input
-                placeholder="회사명으로 필터링 (선택사항)"
-                value={filters.company_name}
-                onChange={(e) => handleFilterChange("company_name", e.target.value)}
-              />
-            </div>
-            <Button onClick={handleSearch} disabled={loading}>
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="mr-2 h-4 w-4" />
-              )}
-              검색
-            </Button>
-            {(filters.factbook_id || filters.company_name) && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setFilters({ factbook_id: "", company_name: "" })
-                  setTimeout(() => fetchLogs(), 100)
-                }}
-              >
-                필터 초기화
-              </Button>
-            )}
-          </div>
-          <div className="mt-4 text-sm text-muted-foreground">
-            총 {totalCount}개의 로그
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="menu-recommendation" className="flex items-center gap-2">
+            <LayoutList className="w-4 h-4" />
+            메뉴 추천 로그
+          </TabsTrigger>
+          <TabsTrigger value="rfp-extraction" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            RFP 정보 추출 로그
+          </TabsTrigger>
+        </TabsList>
 
-      {/* 로그 리스트 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>로그 목록</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : logs.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                로그가 없습니다.
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {logs.map((log) => (
-                  <div
-                    key={log.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedLog?.id === log.id
-                        ? "bg-primary/10 border-primary"
-                        : "hover:bg-muted"
-                    }`}
-                    onClick={() => setSelectedLog(log)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-semibold">{log.company_name}</span>
-                          {log.error_message ? (
-                            <Badge variant="destructive">에러</Badge>
-                          ) : (
-                            <Badge>성공</Badge>
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          {log.product_name && (
-                            <div>상품: {log.product_name}</div>
-                          )}
-                          {log.category && <div>카테고리: {log.category}</div>}
-                          {log.factbook_id && (
-                            <div>팩트북 ID: {log.factbook_id}</div>
-                          )}
-                          <div>생성일: {formatDate(log.created_at)}</div>
-                        </div>
-                      </div>
-                    </div>
+        <div className="mt-6 space-y-6">
+          {/* 필터 - 메뉴 추천 탭에서만 표시 */}
+          {mainTab === "menu-recommendation" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>필터 (선택사항)</CardTitle>
+                <CardDescription>
+                  필터 없이 조회하면 전체 로그가 표시됩니다.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium mb-2 block">팩트북 ID (선택)</label>
+                    <Input
+                      placeholder="팩트북 ID로 필터링 (선택사항)"
+                      value={filters.factbook_id}
+                      onChange={(e) => handleFilterChange("factbook_id", e.target.value)}
+                    />
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 로그 상세 */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>로그 상세</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {selectedLog ? (
-              <div className="space-y-4">
-                {/* 탭 */}
-                <div className="flex gap-2 border-b">
-                  <button
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === "prompt"
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground"
-                    }`}
-                    onClick={() => setActiveTab("prompt")}
-                  >
-                    프롬프트
-                  </button>
-                  <button
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === "response"
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground"
-                    }`}
-                    onClick={() => setActiveTab("response")}
-                  >
-                    응답
-                  </button>
-                  <button
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === "params"
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground"
-                    }`}
-                    onClick={() => setActiveTab("params")}
-                  >
-                    파라미터
-                  </button>
+                  <div className="flex-1">
+                    <label className="text-sm font-medium mb-2 block">회사명 (선택)</label>
+                    <Input
+                      placeholder="회사명으로 필터링 (선택사항)"
+                      value={filters.company_name}
+                      onChange={(e) => handleFilterChange("company_name", e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={handleSearch} disabled={loading}>
+                    {loading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="mr-2 h-4 w-4" />
+                    )}
+                    검색
+                  </Button>
+                  {(filters.factbook_id || filters.company_name) && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setFilters({ factbook_id: "", company_name: "" })
+                        setTimeout(() => fetchMenuLogs(), 100)
+                      }}
+                    >
+                      필터 초기화
+                    </Button>
+                  )}
                 </div>
+                <div className="mt-4 text-sm text-muted-foreground">
+                  총 {totalMenuCount}개의 로그
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-                {/* 내용 */}
-                <div className="max-h-[500px] overflow-y-auto">
-                  {activeTab === "prompt" && (
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="font-semibold mb-2">입력 정보</h3>
-                        <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
-                          <div>
-                            <strong>회사명:</strong> {selectedLog.company_name}
+          {/* 로그 리스트 및 상세 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 리스트 패널 */}
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle>
+                  {mainTab === "menu-recommendation" ? "메뉴 추천 로그 목록" : "RFP 정보 추출 로그 목록"}
+                </CardTitle>
+                {mainTab === "rfp-extraction" && (
+                  <CardDescription>총 {totalRfpCount}개의 로그가 있습니다.</CardDescription>
+                )}
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (mainTab === "menu-recommendation" ? menuLogs : rfpLogs).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    로그가 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                    {(mainTab === "menu-recommendation" ? menuLogs : rfpLogs).map((log) => (
+                      <div
+                        key={log.id}
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          (mainTab === "menu-recommendation" ? selectedMenuLog?.id : selectedRfpLog?.id) === log.id
+                            ? "bg-primary/10 border-primary"
+                            : "hover:bg-muted"
+                        }`}
+                        onClick={() => {
+                          if (mainTab === "menu-recommendation") {
+                            setSelectedMenuLog(log as MenuRecommendationLog)
+                          } else {
+                            setSelectedRfpLog(log as RFPExtractionLog)
+                          }
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-semibold">
+                                {mainTab === "menu-recommendation" 
+                                  ? (log as MenuRecommendationLog).company_name 
+                                  : (log as RFPExtractionLog).extracted_data?.company_name || "알 수 없는 기업"}
+                              </span>
+                              {log.error_message ? (
+                                <Badge variant="destructive">에러</Badge>
+                              ) : (
+                                <Badge>성공</Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              {mainTab === "menu-recommendation" ? (
+                                <>
+                                  {(log as MenuRecommendationLog).product_name && (
+                                    <div>상품: {(log as MenuRecommendationLog).product_name}</div>
+                                  )}
+                                  {(log as MenuRecommendationLog).category && (
+                                    <div>카테고리: {(log as MenuRecommendationLog).category}</div>
+                                  )}
+                                  {(log as MenuRecommendationLog).factbook_id && (
+                                    <div>팩트북 ID: {(log as MenuRecommendationLog).factbook_id}</div>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  {(log as RFPExtractionLog).extracted_data?.category && (
+                                    <div>카테고리: {(log as RFPExtractionLog).extracted_data?.category}</div>
+                                  )}
+                                  {(log as RFPExtractionLog).rfp_text && (
+                                    <div className="truncate max-w-[300px]">
+                                      대상 텍스트: {(log as RFPExtractionLog).rfp_text.substring(0, 50)}...
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              <div>생성일: {formatDate(log.created_at)}</div>
+                            </div>
                           </div>
-                          {selectedLog.product_name && (
-                            <div>
-                              <strong>상품명:</strong> {selectedLog.product_name}
-                            </div>
-                          )}
-                          {selectedLog.category && (
-                            <div>
-                              <strong>카테고리:</strong> {selectedLog.category}
-                            </div>
-                          )}
-                          {selectedLog.proposals && selectedLog.proposals.length > 0 && (
-                            <div>
-                              <strong>제안 내용:</strong>{" "}
-                              {selectedLog.proposals.join(", ")}
-                            </div>
-                          )}
-                          {selectedLog.competitors &&
-                            selectedLog.competitors.length > 0 && (
-                              <div>
-                                <strong>경쟁사:</strong>{" "}
-                                {selectedLog.competitors.join(", ")}
-                              </div>
-                            )}
-                          {selectedLog.target_users &&
-                            selectedLog.target_users.length > 0 && (
-                              <div>
-                                <strong>타겟 사용자:</strong>{" "}
-                                {selectedLog.target_users.join(", ")}
-                              </div>
-                            )}
                         </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold mb-2">프롬프트</h3>
-                        <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">
-                          {selectedLog.prompt}
-                        </pre>
-                      </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                  {activeTab === "response" && (
-                    <div className="space-y-4">
-                      {selectedLog.error_message ? (
-                        <div>
-                          <h3 className="font-semibold mb-2 text-destructive">에러</h3>
-                          <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-                            <div className="text-sm">
-                              <strong>에러 타입:</strong> {selectedLog.error_type}
+            {/* 상세 패널 */}
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle>로그 상세</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(mainTab === "menu-recommendation" ? selectedMenuLog : selectedRfpLog) ? (
+                  <div className="space-y-4">
+                    {/* 탭 */}
+                    <div className="flex gap-2 border-b">
+                      <button
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                          activeTab === "prompt"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground"
+                        }`}
+                        onClick={() => setActiveTab("prompt")}
+                      >
+                        프롬프트
+                      </button>
+                      <button
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                          activeTab === "response"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground"
+                        }`}
+                        onClick={() => setActiveTab("response")}
+                      >
+                        응답
+                      </button>
+                      <button
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                          activeTab === "params"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground"
+                        }`}
+                        onClick={() => setActiveTab("params")}
+                      >
+                        파라미터
+                      </button>
+                    </div>
+
+                    {/* 내용 */}
+                    <div className="max-h-[500px] overflow-y-auto">
+                      {activeTab === "prompt" && (
+                        <div className="space-y-4">
+                          {mainTab === "menu-recommendation" && selectedMenuLog && (
+                            <div>
+                              <h3 className="font-semibold mb-2">입력 정보</h3>
+                              <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
+                                <div>
+                                  <strong>회사명:</strong> {selectedMenuLog.company_name}
+                                </div>
+                                {selectedMenuLog.product_name && (
+                                  <div>
+                                    <strong>상품명:</strong> {selectedMenuLog.product_name}
+                                  </div>
+                                )}
+                                {selectedMenuLog.category && (
+                                  <div>
+                                    <strong>카테고리:</strong> {selectedMenuLog.category}
+                                  </div>
+                                )}
+                                {selectedMenuLog.proposals && selectedMenuLog.proposals.length > 0 && (
+                                  <div>
+                                    <strong>제안 내용:</strong>{" "}
+                                    {selectedMenuLog.proposals.join(", ")}
+                                  </div>
+                                )}
+                                {selectedMenuLog.competitors &&
+                                  selectedMenuLog.competitors.length > 0 && (
+                                    <div>
+                                      <strong>경쟁사:</strong>{" "}
+                                      {selectedMenuLog.competitors.join(", ")}
+                                    </div>
+                                  )}
+                                {selectedMenuLog.target_users &&
+                                  selectedMenuLog.target_users.length > 0 && (
+                                    <div>
+                                      <strong>타겟 사용자:</strong>{" "}
+                                      {selectedMenuLog.target_users.join(", ")}
+                                    </div>
+                                  )}
+                              </div>
                             </div>
-                            <div className="text-sm mt-2">
-                              <strong>에러 메시지:</strong>
+                          )}
+                          
+                          {mainTab === "rfp-extraction" && selectedRfpLog && (
+                            <div>
+                              <h3 className="font-semibold mb-2">원본 텍스트 (일부)</h3>
+                              <div className="bg-muted p-4 rounded-lg text-sm whitespace-pre-wrap">
+                                {selectedRfpLog.rfp_text}
+                              </div>
                             </div>
-                            <pre className="mt-2 text-xs overflow-x-auto whitespace-pre-wrap">
-                              {selectedLog.error_message}
+                          )}
+
+                          <div>
+                            <h3 className="font-semibold mb-2">전체 프롬프트</h3>
+                            <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">
+                              {mainTab === "menu-recommendation" ? selectedMenuLog?.prompt : selectedRfpLog?.prompt}
                             </pre>
                           </div>
                         </div>
-                      ) : (
-                        <>
-                          {selectedLog.recommended_items && (
+                      )}
+
+                      {activeTab === "response" && (
+                        <div className="space-y-4">
+                          {((mainTab === "menu-recommendation" ? selectedMenuLog : selectedRfpLog) as any)?.error_message ? (
                             <div>
-                              <h3 className="font-semibold mb-2">추천된 메뉴 항목</h3>
-                              <div className="bg-muted p-4 rounded-lg space-y-4">
-                                {selectedLog.recommended_items.market && (
-                                  <div>
-                                    <strong className="text-sm">시장 현황:</strong>
-                                    <ul className="mt-2 space-y-1 text-sm">
-                                      {selectedLog.recommended_items.market.map(
-                                        (item, idx) => (
-                                          <li key={idx} className="list-disc list-inside">
-                                            {item}
-                                          </li>
-                                        )
-                                      )}
-                                    </ul>
-                                  </div>
-                                )}
-                                {selectedLog.recommended_items.ownCompany && (
-                                  <div>
-                                    <strong className="text-sm">자사 분석:</strong>
-                                    <ul className="mt-2 space-y-1 text-sm">
-                                      {selectedLog.recommended_items.ownCompany.map(
-                                        (item, idx) => (
-                                          <li key={idx} className="list-disc list-inside">
-                                            {item}
-                                          </li>
-                                        )
-                                      )}
-                                    </ul>
-                                  </div>
-                                )}
-                                {selectedLog.recommended_items.competitor && (
-                                  <div>
-                                    <strong className="text-sm">경쟁사 분석:</strong>
-                                    <ul className="mt-2 space-y-1 text-sm">
-                                      {selectedLog.recommended_items.competitor.map(
-                                        (item, idx) => (
-                                          <li key={idx} className="list-disc list-inside">
-                                            {item}
-                                          </li>
-                                        )
-                                      )}
-                                    </ul>
-                                  </div>
-                                )}
-                                {selectedLog.recommended_items.target && (
-                                  <div>
-                                    <strong className="text-sm">타겟 분석:</strong>
-                                    <ul className="mt-2 space-y-1 text-sm">
-                                      {selectedLog.recommended_items.target.map(
-                                        (item, idx) => (
-                                          <li key={idx} className="list-disc list-inside">
-                                            {item}
-                                          </li>
-                                        )
-                                      )}
-                                    </ul>
-                                  </div>
-                                )}
+                              <h3 className="font-semibold mb-2 text-destructive">에러</h3>
+                              <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                                <div className="text-sm">
+                                  <strong>에러 타입:</strong> {((mainTab === "menu-recommendation" ? selectedMenuLog : selectedRfpLog) as any).error_type}
+                                </div>
+                                <div className="text-sm mt-2">
+                                  <strong>에러 메시지:</strong>
+                                </div>
+                                <pre className="mt-2 text-xs overflow-x-auto whitespace-pre-wrap">
+                                  {((mainTab === "menu-recommendation" ? selectedMenuLog : selectedRfpLog) as any).error_message}
+                                </pre>
                               </div>
                             </div>
+                          ) : (
+                            <>
+                              {mainTab === "menu-recommendation" && selectedMenuLog?.recommended_items && (
+                                <div>
+                                  <h3 className="font-semibold mb-2">추천된 메뉴 항목</h3>
+                                  <div className="bg-muted p-4 rounded-lg space-y-4">
+                                    {selectedMenuLog.recommended_items.market && (
+                                      <div>
+                                        <strong className="text-sm">시장 현황:</strong>
+                                        <ul className="mt-2 space-y-1 text-sm">
+                                          {selectedMenuLog.recommended_items.market.map(
+                                            (item, idx) => (
+                                              <li key={idx} className="list-disc list-inside">
+                                                {item}
+                                              </li>
+                                            )
+                                          )}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {/* ... (기타 메뉴 항목 생략 - 기존 코드 유지) ... */}
+                                    {selectedMenuLog.recommended_items.ownCompany && (
+                                      <div>
+                                        <strong className="text-sm">자사 분석:</strong>
+                                        <ul className="mt-2 space-y-1 text-sm">
+                                          {selectedMenuLog.recommended_items.ownCompany.map(
+                                            (item, idx) => (
+                                              <li key={idx} className="list-disc list-inside">
+                                                {item}
+                                              </li>
+                                            )
+                                          )}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {selectedMenuLog.recommended_items.competitor && (
+                                      <div>
+                                        <strong className="text-sm">경쟁사 분석:</strong>
+                                        <ul className="mt-2 space-y-1 text-sm">
+                                          {selectedMenuLog.recommended_items.competitor.map(
+                                            (item, idx) => (
+                                              <li key={idx} className="list-disc list-inside">
+                                                {item}
+                                              </li>
+                                            )
+                                          )}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {selectedMenuLog.recommended_items.target && (
+                                      <div>
+                                        <strong className="text-sm">타겟 분석:</strong>
+                                        <ul className="mt-2 space-y-1 text-sm">
+                                          {selectedMenuLog.recommended_items.target.map(
+                                            (item, idx) => (
+                                              <li key={idx} className="list-disc list-inside">
+                                                {item}
+                                              </li>
+                                            )
+                                          )}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {mainTab === "rfp-extraction" && selectedRfpLog?.extracted_data && (
+                                <div>
+                                  <h3 className="font-semibold mb-2">추출된 정보</h3>
+                                  <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
+                                    {JSON.stringify(selectedRfpLog.extracted_data, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
+
+                              <div>
+                                <h3 className="font-semibold mb-2">원본 응답</h3>
+                                <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">
+                                  {mainTab === "menu-recommendation" ? selectedMenuLog?.response_content : selectedRfpLog?.response_content}
+                                </pre>
+                              </div>
+                            </>
                           )}
-                          {selectedLog.response_content && (
-                            <div>
-                              <h3 className="font-semibold mb-2">원본 응답</h3>
-                              <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">
-                                {selectedLog.response_content}
-                              </pre>
-                            </div>
-                          )}
-                        </>
+                        </div>
+                      )}
+
+                      {activeTab === "params" && (
+                        <div>
+                          <h3 className="font-semibold mb-2">API 파라미터</h3>
+                          <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
+                            {JSON.stringify((mainTab === "menu-recommendation" ? selectedMenuLog : selectedRfpLog)?.api_params, null, 2)}
+                          </pre>
+                        </div>
                       )}
                     </div>
-                  )}
-
-                  {activeTab === "params" && (
-                    <div>
-                      <h3 className="font-semibold mb-2">API 파라미터</h3>
-                      <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
-                        {JSON.stringify(selectedLog.api_params, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                로그를 선택하세요.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    로그를 선택하세요.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </Tabs>
     </div>
   )
 }

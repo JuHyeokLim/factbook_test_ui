@@ -1,18 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { FactbookList } from "@/components/factbook/factbook-list"
-import { CreateFactbookModal } from "@/components/factbook/create-factbook-modal"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 
 export default function Home() {
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const router = useRouter()
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  const handleCreateSuccess = () => {
-    setIsModalOpen(false)
-    setRefreshTrigger((prev) => prev + 1)
+  const handleCreateClick = () => {
+    router.push("/factbook/create")
   }
 
   return (
@@ -21,9 +20,9 @@ export default function Home() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">팩트북 생성 AI Agent</h1>
+            <h1 className="text-3xl font-bold text-foreground mb-2">팩트북 AI</h1>
           </div>
-          <Button onClick={() => setIsModalOpen(true)} size="lg" className="gap-2">
+          <Button onClick={handleCreateClick} size="lg" className="gap-2">
             <Plus className="w-5 h-5" />
             새 팩트북 만들기
           </Button>
@@ -31,9 +30,6 @@ export default function Home() {
 
         {/* Factbook List */}
         <FactbookList key={refreshTrigger} />
-
-        {/* Create Modal */}
-        <CreateFactbookModal open={isModalOpen} onOpenChange={setIsModalOpen} onCreateSuccess={handleCreateSuccess} />
       </div>
     </main>
   )

@@ -3,8 +3,10 @@
 import { useEffect } from "react"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, X } from "lucide-react"
+import { Plus, X, Lock, Layout, BarChart3, Building2, Users, Target, Info, Sparkles, Trash2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface MenuConfigStepProps {
   formData: any
@@ -14,6 +16,7 @@ interface MenuConfigStepProps {
 interface MenuItem {
   id: string
   title: string
+  icon: React.ReactNode
   isFixed: boolean
   defaultItems: string[]
 }
@@ -91,6 +94,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     id: "company",
     title: "기업 정보",
+    icon: <Building2 className="w-4 h-4" />,
     isFixed: true,
     defaultItems: [
       "기본 정보 (회사 로고, 회사 이름, 대표자, 주소, 홈페이지, 업종, 설립일)",
@@ -103,6 +107,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     id: "market",
     title: "시장 현황",
+    icon: <BarChart3 className="w-4 h-4" />,
     isFixed: false,
     defaultItems: [
       "국내 광고/마케팅 시장의 최근 3년간 규모 및 연평균 성장률 분석",
@@ -113,6 +118,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     id: "ownCompany",
     title: "자사 분석",
+    icon: <Layout className="w-4 h-4" />,
     isFixed: false,
     defaultItems: [
       "대홍기획의 광고/마케팅 서비스별 핵심 USP 및 세부 역량 분석",
@@ -123,6 +129,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     id: "competitor",
     title: "경쟁사 분석",
+    icon: <Users className="w-4 h-4" />,
     isFixed: false,
     defaultItems: [
       "대홍기획의 주요 경쟁사(제일기획, 이노션, HSAD) 비교 (시장 점유율, 주요 클라이언트, 서비스 역량 등)",
@@ -133,6 +140,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     id: "target",
     title: "타겟 분석",
+    icon: <Target className="w-4 h-4" />,
     isFixed: false,
     defaultItems: [
       "광고/마케팅 서비스 클라이언트의 관심사, 가치관, 라이프스타일, 미디어 소비 패턴 등 심리/행동적 특성 분석",
@@ -160,6 +168,22 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
       }
     }
   }, []) // 마운트 시 한 번만 실행
+
+  // 텍스트 영역 높이 자동 조절 (최대 3줄)
+  useEffect(() => {
+    const adjustHeight = () => {
+      const textareas = document.querySelectorAll('.menu-item-textarea');
+      textareas.forEach(ta => {
+        if (ta instanceof HTMLTextAreaElement) {
+          ta.style.height = 'auto';
+          ta.style.height = `${Math.min(ta.scrollHeight, 68)}px`;
+        }
+      });
+    };
+
+    adjustHeight();
+    // 데이터가 변경될 때마다 다시 조정
+  }, [formData.menuItems]);
   
   const getMenuItems = (menuId: string): string[] => {
     return formData.menuItems?.[menuId] || MENU_ITEMS.find((m) => m.id === menuId)?.defaultItems || []
@@ -230,118 +254,141 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* 제목 섹션 */}
-      <div>
-        <h3 className="text-lg font-bold text-foreground mb-1">
-          팩트북의 메뉴 항목을 설정하세요.
-        </h3>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-none p-5">
+      {/* 제목 및 가이드 섹션 */}
+      <div className="flex flex-col gap-1.5 border-b border-slate-100 pb-6">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-blue-50 rounded-lg">
+            <Sparkles className="w-4 h-4 text-blue-600" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+            목차 구성 설정
+          </h3>
+        </div>
+        <p className="text-[13px] text-slate-500 font-medium ml-9">
+          팩트북의 목차 항목을 확인하고 필요에 따라 수정하거나 추가할 수 있습니다.
+        </p>
       </div>
 
       {/* 메뉴 항목 리스트 - 그리드 레이아웃 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {MENU_ITEMS.map((menu, idx) => {
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {MENU_ITEMS.map((menu) => {
           const items = getMenuItems(menu.id)
           const canAdd = items.length < 10
           const isCompanyInfo = menu.id === "company"
 
           return (
-            <div key={menu.id} className="px-4 pt-4 pb-3 bg-muted/30 rounded-lg border border-border flex flex-col">
-              {/* 번호와 목차명 */}
-              <div className="flex items-center gap-2 mb-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                  {idx + 1}
+            <div 
+              key={menu.id} 
+              className="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col"
+            >
+              {/* 카드 헤더 */}
+              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-600 group-hover:text-blue-600 group-hover:border-blue-100 transition-colors">
+                    {menu.icon}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[15px] font-bold text-slate-800 tracking-tight">{menu.title}</span>
+                    <span className="text-[11px] text-slate-400 font-medium">총 {items.length}개 항목</span>
+                  </div>
                 </div>
-                <div className="flex-1 flex items-center justify-between min-w-0">
-                  <span className="text-sm font-bold text-foreground truncate">{menu.title}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-7 text-primary hover:text-primary flex-shrink-0"
-                    onClick={() => handleAddItem(menu.id)}
-                    disabled={!canAdd}
-                  >
-                    <Plus className="w-3 h-3 mr-1" />
-                    추가
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3 text-[12px] font-semibold border-slate-200 bg-white hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all rounded-lg gap-1.5"
+                  onClick={() => handleAddItem(menu.id)}
+                  disabled={!canAdd}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  항목 추가
+                </Button>
               </div>
 
               {/* 세부 항목 리스트 */}
-              <div className="space-y-2 flex-1">
-                {items.map((item: string, itemIdx: number) => {
-                  const isFixed = menu.isFixed && itemIdx < menu.defaultItems.length
-                  
-                  // 기업 정보의 경우 모두 고정 (토글 없음)
-                  if (isCompanyInfo) {
+              <div className="p-5 space-y-3 flex-1 bg-white">
+                {items.length === 0 ? (
+                  <div className="py-8 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                    <p className="text-[13px] text-slate-400 font-medium">추가된 항목이 없습니다.</p>
+                  </div>
+                ) : (
+                  items.map((item: string, itemIdx: number) => {
+                    const isFixed = menu.isFixed && itemIdx < menu.defaultItems.length
+                    
                     return (
-                      <div key={itemIdx} className="flex items-center gap-2">
+                      <div 
+                        key={itemIdx} 
+                        className={cn(
+                          "relative group/item flex items-start gap-3 p-3 rounded-xl border transition-all duration-200",
+                          isFixed 
+                            ? "bg-slate-50/50 border-slate-100" 
+                            : "bg-white border-slate-200 hover:border-blue-200 hover:shadow-sm"
+                        )}
+                      >
+                        <div className="mt-2.5 w-1.5 h-1.5 rounded-full bg-slate-300 group-hover/item:bg-blue-400 shrink-0" />
                         <Textarea
                           placeholder="내용을 입력하세요."
                           value={item}
-                          onChange={(e) => handleUpdateItem(menu.id, itemIdx, e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleUpdateItem(menu.id, itemIdx, e.target.value)}
+                          onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+                            const target = e.currentTarget;
+                            target.style.height = 'auto';
+                            target.style.height = `${Math.min(target.scrollHeight, 68)}px`;
+                          }}
                           disabled={isFixed}
-                          className="flex-1 text-xs"
+                          className={cn(
+                            "menu-item-textarea flex-1 text-[13px] leading-relaxed min-h-[20px] max-h-[68px] p-0 bg-transparent border-none shadow-none focus-visible:ring-0 resize-none font-medium transition-all overflow-y-auto",
+                            isFixed ? "text-slate-500" : "text-slate-700"
+                          )}
                         />
-                        {!isFixed && (
+                        {isFixed ? (
+                          <div className="p-1.5 text-slate-300">
+                            <Lock className="w-3.5 h-3.5" />
+                          </div>
+                        ) : (
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleRemoveItem(menu.id, itemIdx)}
-                            className="flex-shrink-0 text-destructive hover:text-destructive h-8 w-8"
+                            className="shrink-0 h-8 w-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
                           >
-                            <X className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         )}
                       </div>
                     )
-                  }
-
-                  return (
-                    <div key={itemIdx} className="flex gap-2">
-                      <Textarea
-                        placeholder="내용을 입력하세요."
-                        value={item}
-                        onChange={(e) => handleUpdateItem(menu.id, itemIdx, e.target.value)}
-                        disabled={isFixed}
-                        className="flex-1 text-xs"
-                      />
-                      {!isFixed && (
-              <Button
-                variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveItem(menu.id, itemIdx)}
-                          className="flex-shrink-0 text-destructive hover:text-destructive h-8 w-8"
-                        >
-                          <X className="w-3 h-3" />
-              </Button>
-                      )}
-                    </div>
-                  )
-                })}
+                  })
+                )}
               </div>
             </div>
           )
         })}
 
-        {/* 매체 소재 분석 - 전체 너비 */}
-        <div className="col-span-full px-4 pt-4 pb-3 bg-muted/30 rounded-lg border border-border">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-              {MENU_ITEMS.length + 1}
+        {/* 매체 소재 분석 - 특수 기능 카드 */}
+        <div className="col-span-full mt-2">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-6 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white border border-blue-100 shadow-sm flex items-center justify-center text-blue-600">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-[15px] font-bold text-slate-800">매체 소재 분석</h4>
+                  {/* <span className="px-2 py-0.5 bg-blue-600 text-[10px] font-bold text-white rounded-full tracking-wider">RECOMMENDED</span> */}
+                </div>
+                <p className="text-[12px] text-slate-500 font-medium leading-relaxed">
+                  자사 및 경쟁사의 매체별 소재(메타, 인스타그램, 구글, Youtube)
+                </p>
+              </div>
             </div>
-            <div className="flex-1 flex items-center justify-between">
-              <span className="text-sm font-bold text-foreground">매체 소재 분석</span>
+            <div className="flex items-center gap-4 bg-white/50 px-4 py-3 rounded-xl border border-blue-100/50">
+              <span className="text-[13px] font-bold text-slate-600">활성화</span>
               <Switch
                 checked={formData.analysisItems?.media ?? false}
                 onCheckedChange={handleToggle}
+                className="data-[state=checked]:bg-blue-600"
               />
             </div>
-          </div>
-          <div className="ml-9">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              자사 및 경쟁사 매체별 소재 (메타, 인스타그램, 구글, Youtube)
-            </p>
           </div>
         </div>
       </div>

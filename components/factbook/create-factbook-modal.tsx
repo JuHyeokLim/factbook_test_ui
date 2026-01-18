@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { BasicInfoStep } from "./steps/basic-info-step"
-import { DetailedInfoStep } from "./steps/detailed-info-step"
+import { UnifiedInfoStep } from "./steps/unified-info-step"
 import { MenuConfigStep } from "./steps/menu-config-step"
 
 const DEFAULT_MENU_ITEMS: Record<string, string[]> = {
@@ -68,9 +67,8 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
   })
 
   const steps = [
-    { title: "기본정보 입력", value: "basic" },
-    { title: "추가정보 입력", value: "additional" },
-    { title: "메뉴 구성", value: "menu" },
+    { title: "주요 정보 입력", value: "info" },
+    { title: "목차 구성", value: "menu" },
   ]
 
   // 모달이 열릴 때마다 상태 초기화
@@ -100,9 +98,9 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
     }
   }, [open])
 
-  // Step 3으로 이동할 때 스크롤을 최상단으로 이동
+  // Step 2로 이동할 때 스크롤을 최상단으로 이동
   useEffect(() => {
-    if (currentStep === 2 && scrollContainerRef.current) {
+    if (currentStep === 1 && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0
     }
   }, [currentStep])
@@ -149,15 +147,11 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
 
   const isStepValid = (step: number): boolean => {
     if (step === 0) {
-      // 기본 정보 입력: 기업명은 필수
+      // 주요 정보 입력: 기업명은 필수
       return formData.companyName.trim() !== ""
     }
     if (step === 1) {
-      // 추가 정보 입력: 모두 선택 사항
-      return true
-    }
-    if (step === 2) {
-      // 메뉴 구성: 항상 유효
+      // 목차 구성: 항상 유효
       return true
     }
     return true
@@ -268,7 +262,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
 
   return (
     <Dialog open={open} onOpenChange={handleModalClose}>
-      <DialogContent className={`${currentStep === 2 ? "!max-w-[95vw] !w-[95vw] sm:!max-w-[95vw]" : "max-w-2xl"} max-h-[90vh] flex flex-col p-6`}>
+      <DialogContent className={`${currentStep === 1 ? "!max-w-[95vw] !w-[95vw] sm:!max-w-[95vw]" : "max-w-2xl"} max-h-[90vh] flex flex-col p-6`}>
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>팩트북 만들기</DialogTitle>
           {/* Progress Indicator */}
@@ -292,7 +286,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
 
         <div ref={scrollContainerRef} className="mt-6 flex-1 overflow-y-auto">
           {currentStep === 0 && (
-            <BasicInfoStep
+            <UnifiedInfoStep
               method={method}
               setMethod={setMethod}
               formData={formData}
@@ -300,11 +294,7 @@ export function CreateFactbookModal({ open, onOpenChange, onCreateSuccess }: Cre
             />
           )}
 
-          {currentStep === 1 && (
-            <DetailedInfoStep formData={formData} setFormData={setFormData} />
-          )}
-
-          {currentStep === 2 && <MenuConfigStep formData={formData} setFormData={setFormData} />}
+          {currentStep === 1 && <MenuConfigStep formData={formData} setFormData={setFormData} />}
         </div>
 
         {/* Navigation - Fixed at bottom */}

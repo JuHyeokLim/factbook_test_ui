@@ -114,6 +114,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  @keyframes shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
 }
 
 @layer base {
@@ -182,4 +187,36 @@ ol[class*="Legend"] li svg[fill="currentColor"] {
 }
 ol[class*="Legend"] li svg circle {
   fill: inherit !important;
+}
+
+/* Legend 아이콘(원) 크기 및 정렬 정상화 */
+ol[class*="Legend"] li svg {
+  width: 9px !important;
+  height: 9px !important;
+  min-width: 9px !important;
+  min-height: 9px !important;
+  flex-shrink: 0 !important;
+  display: inline-block !important;
+}
+
+/* Legend 텍스트 스타일 수정 */
+ol[class*="Legend"] li p {
+  white-space: nowrap !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  margin-left: 6px !important;
+  color: #475569 !important; /* slate-600 */
+}
+
+/* Legend 아이템 배치 수정 */
+ol[class*="Legend"] {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+}
+
+ol[class*="Legend"] li {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-right: 0 !important;
 }
