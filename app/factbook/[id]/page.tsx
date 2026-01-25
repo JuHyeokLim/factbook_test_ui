@@ -17,7 +17,7 @@ import remarkGfm from "remark-gfm"
 import rehypeRaw from "rehype-raw"
 import { AreaChart, BarChart, Card, DonutChart, LineChart, Text, Title, Legend } from "@tremor/react"
 import { exportFactbookToWord } from "@/lib/exportUtils"
-import { toPng, toSvg } from 'html-to-image'
+import { toJpeg, toSvg } from 'html-to-image'
 
 import {
   Dialog,
@@ -53,6 +53,8 @@ interface ReferenceMaterial {
   file_size?: number
   content_type?: string
 }
+
+type FactbookTab = "factbook" | "links" | "images" | "media" | "files";
 
 // 출처 정보 전달을 위한 Context
 const SourcesContext = createContext<Source[]>([])
@@ -177,8 +179,8 @@ const MarkdownImg = memo(({ src, alt, onImageClick }: any) => {
       const link = document.createElement("a")
       link.href = url
       const urlParts = src.split("/")
-      let fileName = urlParts[urlParts.length - 1]?.split("?")[0] || "image.png"
-      if (!fileName.includes(".")) fileName += ".png"
+      let fileName = urlParts[urlParts.length - 1]?.split("?")[0] || "image.jpg"
+      if (!fileName.includes(".")) fileName += ".jpg"
       link.download = fileName
       link.click()
       window.URL.revokeObjectURL(url)
@@ -209,10 +211,10 @@ const MarkdownImg = memo(({ src, alt, onImageClick }: any) => {
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg shadow-sm hover:bg-white text-[11px] font-bold text-slate-600 transition-all"
             >
               <Download className="w-3.5 h-3.5" />
-              PNG
+              JPG
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-[10px] px-2 py-1">PNG 다운로드</TooltipContent>
+          <TooltipContent side="top" className="text-[10px] px-2 py-1">JPG 다운로드</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -249,7 +251,7 @@ const MarkdownLink = memo(({ href, children, ...props }: any) => {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center bg-[#F1F5F9] text-[#64748B] px-1 py-0 rounded-full text-[9px] font-semibold hover:bg-[#E2E8F0] transition-colors cursor-pointer relative z-10 mx-0.5 align-middle mb-0.5"
+                className="inline-flex items-center justify-center bg-[#F1F5F9] text-[#64748B] px-2 py-0 h-5 border-0 m-0 ml-1 rounded-md text-[9px] font-semibold hover:bg-[#E2E8F0] transition-colors cursor-pointer relative z-10 align-middle mb-0.5"
               {...props}
             >
               {displayText}
@@ -484,27 +486,41 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
   const chartRef = useRef<HTMLDivElement>(null)
   const [isHovered, setIsHovered] = useState(false)
 
-  const handleDownload = async (format: 'png' | 'svg') => {
+  const handleDownload = async (format: 'jpg' | 'svg') => {
     if (!chartRef.current) return
     try {
       // [수정] 애니메이션이 완전히 끝나고 스타일이 확정되도록 대기 시간을 늘립니다.
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      // [추가] SVG 요소들의 스타일을 인라인으로 강제 변환하여 검정색 방지
+      // [추가] SVG 요소들의 스타일을 인라인으로 강제 변환하여 검정색 방지 및 PPT 호환성 향상
       const svgElements = chartRef.current.querySelectorAll('svg');
       svgElements.forEach((svg) => {
-        const paths = svg.querySelectorAll('path, circle, rect, text');
-        paths.forEach((el) => {
+        // PPT 호환성을 위한 네임스페이스 추가
+        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        
+        const allElements = svg.querySelectorAll('*');
+        allElements.forEach((el) => {
           const computedStyle = window.getComputedStyle(el);
-          const fill = computedStyle.getPropertyValue('fill');
-          const stroke = computedStyle.getPropertyValue('stroke');
           
-          if (fill && fill !== 'none' && !fill.includes('url')) {
-            (el as HTMLElement).style.fill = fill;
-          }
-          if (stroke && stroke !== 'none' && !stroke.includes('url')) {
-            (el as HTMLElement).style.stroke = stroke;
-          }
+          // PPT에서 렌더링에 필요한 핵심 스타일 속성들을 인라인으로 주입
+          const styleProps = [
+            'fill', 
+            'stroke', 
+            'stroke-width', 
+            'font-family', 
+            'font-size', 
+            'font-weight',
+            'opacity',
+            'display',
+            'visibility'
+          ];
+
+          styleProps.forEach(prop => {
+            const value = computedStyle.getPropertyValue(prop);
+            if (value && value !== 'none' && !value.includes('url')) {
+              (el as HTMLElement).style.setProperty(prop, value);
+            }
+          });
         });
       });
 
@@ -525,8 +541,8 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
       }
 
       let dataUrl = ''
-      if (format === 'png') {
-        dataUrl = await toPng(chartRef.current, options)
+      if (format === 'jpg') {
+        dataUrl = await toJpeg(chartRef.current, options)
       } else {
         dataUrl = await toSvg(chartRef.current, options)
       }
@@ -538,10 +554,15 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
 
       // [추가] 인라인 스타일 원상복구 (화면 렌더링에 영향 주지 않기 위함)
       svgElements.forEach((svg) => {
-        const paths = svg.querySelectorAll('path, circle, rect, text');
-        paths.forEach((el) => {
+        const allElements = svg.querySelectorAll('*');
+        allElements.forEach((el) => {
           (el as HTMLElement).style.fill = '';
           (el as HTMLElement).style.stroke = '';
+          (el as HTMLElement).style.strokeWidth = '';
+          (el as HTMLElement).style.fontFamily = '';
+          (el as HTMLElement).style.fontSize = '';
+          (el as HTMLElement).style.fontWeight = '';
+          (el as HTMLElement).style.opacity = '';
         });
       });
     } catch (err) {
@@ -556,11 +577,11 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
       <div className={`absolute top-4 right-4 z-10 flex gap-2 transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
-            <button onClick={() => handleDownload('png')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 text-[11px] font-bold text-slate-600 transition-all">
-              <Download className="w-3.5 h-3.5" /> PNG
+            <button onClick={() => handleDownload('jpg')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 text-[11px] font-bold text-slate-600 transition-all">
+              <Download className="w-3.5 h-3.5" /> JPG
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-[10px] px-2 py-1">PNG 다운로드</TooltipContent>
+          <TooltipContent side="top" className="text-[10px] px-2 py-1">JPG 다운로드</TooltipContent>
         </Tooltip>
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
@@ -892,8 +913,8 @@ const createMarkdownComponents = (
         link.href = url
         
         const urlParts = src.split("/")
-        let fileName = urlParts[urlParts.length - 1]?.split("?")[0] || "image.png"
-        if (!fileName.includes(".")) fileName += ".png"
+        let fileName = urlParts[urlParts.length - 1]?.split("?")[0] || "image.jpg"
+        if (!fileName.includes(".")) fileName += ".jpg"
         
         link.download = fileName
         link.click()
@@ -925,11 +946,11 @@ const createMarkdownComponents = (
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg shadow-sm hover:bg-white text-[11px] font-bold text-slate-600 transition-all"
               >
                 <Download className="w-3.5 h-3.5" />
-                PNG
+                JPG
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-[10px] px-2 py-1">
-              PNG 다운로드
+              JPG 다운로드
             </TooltipContent>
           </Tooltip>
         </div>
@@ -969,7 +990,7 @@ const createMarkdownComponents = (
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center bg-[#F1F5F9] text-[#64748B] px-1 py-0 rounded-full text-[9px] font-semibold hover:bg-[#E2E8F0] transition-colors cursor-pointer relative z-10 mx-0.5 align-middle mb-0.5"
+                className="inline-flex items-center justify-center bg-[#F1F5F9] text-[#64748B] px-2 py-0 h-5 border-0 m-0 ml-1 rounded-md text-[9px] font-semibold hover:bg-[#E2E8F0] transition-colors cursor-pointer relative z-10 align-middle mb-0.5"
                 {...props}
               >
                 {displayText}
@@ -1188,7 +1209,7 @@ export default function FactbookDetailPage() {
   const [factbook, setFactbook] = useState<FactbookDetail | null>(null)
   const [activeSection, setActiveSection] = useState<string>("")
   const [expandedSection, setExpandedSection] = useState<string | undefined>(undefined) // Accordion에서 열린 섹션
-  const [activeTab, setActiveTab] = useState<"factbook" | "links" | "images" | "media">("factbook")
+  const [activeTab, setActiveTab] = useState<FactbookTab>("factbook")
   const [sourceTab, setSourceTab] = useState<"source" | "image">("source") // 출처/이미지 탭 (기존 사이드바용, 유지)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
@@ -1198,6 +1219,57 @@ export default function FactbookDetailPage() {
   const [isInputInfoOpen, setIsInputInfoOpen] = useState(false)
   const mainContentRef = useRef<HTMLDivElement>(null) // 메인 콘텐츠 스크롤 컨테이너 ref
   const { toast } = useToast()
+
+  // 상단 탭 인디케이터 제어
+  const navTabsRef = useRef<(HTMLButtonElement | null)[]>([])
+  const [navIndicatorStyle, setNavIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 })
+
+  const updateNavIndicator = useCallback(() => {
+    const tabIndices: Record<string, number> = {
+      factbook: 0,
+      files: 1,
+      links: 2,
+      images: 3,
+    }
+    
+    const index = tabIndices[activeTab]
+    if (index !== undefined && navTabsRef.current[index]) {
+      const element = navTabsRef.current[index]
+      if (element) {
+        setNavIndicatorStyle({
+          left: element.offsetLeft,
+          width: element.offsetWidth,
+          opacity: 1,
+        })
+      }
+    } else if (activeTab === "media") {
+      setNavIndicatorStyle((prev) => ({ ...prev, opacity: 0 }))
+    }
+  }, [activeTab])
+
+  // 초기 렌더링 및 탭 변경 시 인디케이터 위치 업데이트
+  useEffect(() => {
+    // 레이아웃이 확정될 때까지 여러 번 시도 (초기 로드 대응)
+    const handleUpdate = () => {
+      updateNavIndicator();
+    };
+
+    // 1. 즉시 실행
+    handleUpdate();
+    
+    // 2. 마운트 직후 (레이아웃 확정 대응)
+    const timer1 = setTimeout(handleUpdate, 50);
+    const timer2 = setTimeout(handleUpdate, 300); // 폰트 로딩 등 지연 대응
+    
+    // 윈도우 리사이즈 시에도 위치 재계산
+    window.addEventListener('resize', handleUpdate);
+    
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      window.removeEventListener('resize', handleUpdate);
+    };
+  }, [updateNavIndicator, factbook]) // factbook 데이터 로드 시점 대응 추가
 
   useEffect(() => {
     const fetchFactbook = async () => {
@@ -1817,8 +1889,8 @@ export default function FactbookDetailPage() {
       <div className="min-h-screen bg-white" style={{ fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif' }}>
         {/* 헤더 */}
         <header className="sticky top-0 bg-white border-b border-slate-200 z-50">
-          <div className="max-w-full px-6 py-4">
-            <div className="flex items-center justify-between">
+          <div className="max-w-full px-6">
+            <div className="flex items-center justify-between h-16">
               {/* 왼쪽: 뒤로가기, 회사명 */}
               <div className="flex items-center gap-4 flex-1">
                 <Link href="/">
@@ -1834,17 +1906,18 @@ export default function FactbookDetailPage() {
               </div>
 
               {/* 오른쪽: 메뉴 버튼들 */}
-              <div className="flex items-center gap-6">
+              <nav className="flex items-center gap-6 relative h-16">
                 <button
+                  ref={(el) => { navTabsRef.current[0] = el; }}
                   onClick={() => {
                     setActiveTab("factbook");
                     setSourceTab("source");
                     setSelectedImageIndex(null);
                   }}
-                  className={`flex items-center gap-2 px-1 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  className={`flex items-center gap-2 px-1 h-full text-sm font-medium transition-colors ${
                     activeTab === "factbook"
-                      ? "text-[#1e293b] border-[#1e293b]"
-                      : "text-slate-500 border-transparent hover:text-slate-800"
+                      ? "text-[#1e293b]"
+                      : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   <FileSearch className="w-5 h-5" />
@@ -1852,22 +1925,31 @@ export default function FactbookDetailPage() {
                 </button>
 
                 <button
-                  className="flex items-center gap-2 px-1 py-2 text-sm font-medium text-slate-300 cursor-not-allowed border-b-2 border-transparent"
-                  disabled
+                  ref={(el) => { navTabsRef.current[1] = el; }}
+                  onClick={() => {
+                    setActiveTab("files");
+                    setSelectedImageIndex(null);
+                  }}
+                  className={`flex items-center gap-2 px-1 h-full text-sm font-medium transition-colors ${
+                    activeTab === "files"
+                      ? "text-[#1e293b]"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
                 >
                   <Folder className="w-5 h-5" />
                   <span>파일</span>
                 </button>
 
                 <button
+                  ref={(el) => { navTabsRef.current[2] = el; }}
                   onClick={() => {
                     setActiveTab("links");
                     setSelectedImageIndex(null);
                   }}
-                  className={`flex items-center gap-2 px-1 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  className={`flex items-center gap-2 px-1 h-full text-sm font-medium transition-colors ${
                     activeTab === "links"
-                      ? "text-[#1e293b] border-[#1e293b]"
-                      : "text-slate-500 border-transparent hover:text-slate-800"
+                      ? "text-[#1e293b]"
+                      : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   <Link2 className="w-5 h-5" />
@@ -1875,20 +1957,31 @@ export default function FactbookDetailPage() {
                 </button>
 
                 <button
+                  ref={(el) => { navTabsRef.current[3] = el; }}
                   onClick={() => {
                     setActiveTab("images");
                     setSelectedImageIndex(null);
                   }}
-                  className={`flex items-center gap-2 px-1 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  className={`flex items-center gap-2 px-1 h-full text-sm font-medium transition-colors ${
                     activeTab === "images"
-                      ? "text-[#1e293b] border-[#1e293b]"
-                      : "text-slate-500 border-transparent hover:text-slate-800"
+                      ? "text-[#1e293b]"
+                      : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   <ImageIcon className="w-5 h-5" />
                   <span>이미지</span>
                 </button>
-              </div>
+
+                {/* 슬라이딩 인디케이터 */}
+                <div
+                  className="absolute bottom-[-1px] h-[3px] bg-[#1e293b] rounded-t-full transition-all duration-300 ease-in-out"
+                  style={{
+                    left: navIndicatorStyle.left,
+                    width: navIndicatorStyle.width,
+                    opacity: navIndicatorStyle.opacity,
+                  }}
+                />
+              </nav>
             </div>
           </div>
         </header>
@@ -2006,21 +2099,21 @@ export default function FactbookDetailPage() {
                 <table className="w-full text-[11px]">
                   <tbody className="divide-y divide-slate-200">
                     <tr className="py-1">
-                      <td className="text-[#94a3b8] py-1 w-16 font-medium">브랜드</td>
-                      <td className="text-[#475569] py-1 font-semibold text-right">{factbook.companyName}</td>
+                      <td className="text-[#94a3b8] py-1 w-16 font-medium">기업</td>
+                      <td className="text-[#475569] pl-4 py-1 font-semibold text-left">{factbook.companyName}</td>
                     </tr>
                     <tr className="py-1">
                       <td className="text-[#94a3b8] py-1 w-16 font-medium">업종</td>
-                      <td className="text-[#475569] py-1 font-semibold text-right">{factbook.category || "기타"}</td>
+                      <td className="text-[#475569] pl-4 py-1 font-semibold text-left">{factbook.category || "기타"}</td>
                     </tr>
                     <tr className="py-1">
-                      <td className="text-[#94a3b8] py-1 w-16 font-medium">제품</td>
-                      <td className="text-[#475569] py-1 font-semibold text-right">{factbook.productName}</td>
+                      <td className="text-[#94a3b8] py-1 w-16 font-medium">제품/서비스</td>
+                      <td className="text-[#475569] pl-4 py-1 font-semibold text-left">{factbook.productName}</td>
                     </tr>
                     <tr className="py-1 border-t border-dashed border-slate-300">
-                      <td className="text-[#94a3b8] py-1 w-16 font-medium">작성 정보</td>
-                      <td className="text-[#475569] py-1 font-semibold text-right">
-                        {new Date().toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')}
+                      <td className="text-[#94a3b8] py-1 w-16 font-medium">생성일</td>
+                      <td className="text-[#475569] pl-4 py-1 font-semibold text-left">
+                        {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')}
                       </td>
                     </tr>
                     <tr 
@@ -2028,7 +2121,7 @@ export default function FactbookDetailPage() {
                       onClick={() => setIsInputInfoOpen(true)}
                     >
                       <td className="text-[#94a3b8] py-1 w-16 font-medium">입력 정보</td>
-                      <td className="text-[#475569] py-1 font-semibold text-right flex justify-end">
+                      <td className="text-[#475569] pl-4 py-1 font-semibold text-left flex justify-start items-center">
                         <div className="w-4 h-4 rounded bg-[#e2e8f0] flex items-center justify-center text-[#94a3b8] group-hover/row:bg-blue-100 group-hover/row:text-blue-600 transition-colors">
                           <ExternalLink className="w-2.5 h-2.5" />
                         </div>
@@ -2103,6 +2196,128 @@ export default function FactbookDetailPage() {
                   </div>
                 ))}
               </div>
+            ) : (activeTab as string) === "files" ? (
+              <div className="max-w-6xl mx-auto px-12">
+                <h2 className="text-2xl font-bold text-[#4D5D71] mb-10">참고 파일</h2>
+                
+                {factbook.references && factbook.references.filter(ref => ref.type === 'file' || ref.type === 'text').length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {factbook.references
+                      .filter(ref => ref.type === 'file' || ref.type === 'text')
+                      .map((ref) => {
+                      const getFileInfo = (name: string, type: string) => {
+                        if (type === "text") {
+                          return { icon: FileText, bg: "bg-emerald-50", text: "text-emerald-500", label: "텍스트" }
+                        }
+                        const ext = name?.split('.').pop()?.toLowerCase()
+                        switch(ext) {
+                          case 'pdf': return { icon: FileText, bg: "bg-red-50", text: "text-red-500", label: "PDF" }
+                          case 'ppt':
+                          case 'pptx': return { icon: FileText, bg: "bg-orange-50", text: "text-orange-500", label: "PPT" }
+                          case 'doc':
+                          case 'docx': return { icon: FileText, bg: "bg-blue-50", text: "text-blue-500", label: "Word" }
+                          case 'xls':
+                          case 'xlsx': return { icon: FileText, bg: "bg-green-50", text: "text-green-600", label: "Excel" }
+                          case 'txt': return { icon: FileText, bg: "bg-slate-100", text: "text-slate-500", label: "기타" }
+                          default: return { icon: Folder, bg: "bg-slate-100", text: "text-slate-500", label: "파일" }
+                        }
+                      }
+                      const fileInfo = getFileInfo(ref.name, ref.type)
+                      const IconComponent = fileInfo.icon
+                      const handleDownload = async (e: React.MouseEvent) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        try {
+                          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+                          const response = await fetch(`${backendUrl}/api/references/${ref.id}/download`)
+                          if (!response.ok) throw new Error('다운로드 실패')
+                          const blob = await response.blob()
+                          const url = window.URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          let downloadName = ref.name
+                          if (ref.type === "text" && !downloadName.toLowerCase().endsWith(".txt")) downloadName += ".txt"
+                          a.download = downloadName
+                          document.body.appendChild(a)
+                          a.click()
+                          window.URL.revokeObjectURL(url)
+                          document.body.removeChild(a)
+                        } catch (error) {
+                          console.error('참고 자료 다운로드 실패:', error)
+                          alert('참고 자료 다운로드에 실패했습니다.')
+                        }
+                      }
+                      return (
+                        <div key={ref.id} className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${fileInfo.bg} ${fileInfo.text}`}>
+                            <IconComponent className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[13px] font-bold text-slate-800 truncate" title={ref.name}>{ref.name}</h4>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-slate-200 text-slate-400 font-medium">
+                                {fileInfo.label}
+                              </Badge>
+                              {ref.file_size && <span className="text-[10px] text-slate-400">{(ref.file_size / 1024).toFixed(1)} KB</span>}
+                            </div>
+                          </div>
+                          <button onClick={handleDownload} className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-blue-600 transition-all" title="다운로드">
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
+                    <p className="text-slate-500 text-sm">등록된 참고 파일이 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            ) : (activeTab as string) === "images" ? (
+              <div className="max-w-6xl mx-auto px-12">
+                <h2 className="text-2xl font-bold text-[#4D5D71] mb-6">이미지</h2>
+                
+                {allImages.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {allImages.map((imgData, idx) => {
+                      const getDomainFromUrl = (url?: string) => {
+                        if (!url) return null
+                        try {
+                          const urlObj = new URL(url)
+                          return urlObj.hostname.replace('www.', '')
+                        } catch { return null }
+                      }
+                      const domain = getDomainFromUrl(imgData.sourceUrl)
+                      const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : null
+
+                      return (
+                        <div key={idx} className="flex flex-col gap-2">
+                          <div 
+                            className="aspect-video bg-slate-100 rounded-xl border border-slate-200 overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all relative group"
+                            onClick={() => handleImageClick(imgData.imageUrl)}
+                          >
+                            <img src={imgData.imageUrl} alt="" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                          </div>
+                          {domain && (
+                            <div className="flex items-center gap-1.5 px-1">
+                              {faviconUrl && (
+                                <img src={faviconUrl} alt="" className="w-3.5 h-3.5 flex-shrink-0" onError={(e) => e.currentTarget.style.display = 'none'} />
+                              )}
+                              <span className="text-[11px] text-slate-500 truncate">{domain}</span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
+                    <p className="text-slate-500 text-sm">수집된 이미지가 없습니다.</p>
+                  </div>
+                )}
+              </div>
             ) : activeTab === "links" ? (
               <div className="max-w-6xl mx-auto px-12">
                 <h2 className="text-2xl font-bold text-[#4D5D71] mb-10">링크</h2>
@@ -2136,117 +2351,37 @@ export default function FactbookDetailPage() {
                   </div>
                 )}
 
-                {/* 1.5. 참고 자료 Section (사용자가 업로드한 파일/링크/텍스트) */}
-                {factbook.references && factbook.references.length > 0 && (
+                {/* 1.5. 참고 자료 Section (사용자가 업로드한 링크만 노출) */}
+                {factbook.references && factbook.references.filter(ref => ref.type === 'link').length > 0 && (
                   <div className="mb-12">
                     <div className="flex items-center gap-2 mb-6 ml-1">
-                      {/* <div className="w-1.5 h-5 bg-blue-500 rounded-full" /> */}
-                      <h3 className="text-[20px] font-extrabold text-[#354355]">참고 자료</h3>
+                      <h3 className="text-[20px] font-extrabold text-[#354355]">참고 자료 (링크)</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {factbook.references.map((ref) => {
-                        // 확장자별 아이콘 및 라벨 설정
-                        const getFileInfo = (name: string, type: string) => {
-                          if (type === "link") {
-                            return { icon: Link2, bg: "bg-amber-50", text: "text-amber-500", label: "링크" }
-                          }
-                          if (type === "text") {
-                            return { icon: FileText, bg: "bg-emerald-50", text: "text-emerald-500", label: "텍스트" }
-                          }
-                          
-                          // 파일 타입: 확장자로 판별
-                          const ext = name?.split('.').pop()?.toLowerCase()
-                          switch(ext) {
-                            case 'pdf':
-                              return { icon: FileText, bg: "bg-red-50", text: "text-red-500", label: "PDF" }
-                            case 'ppt':
-                            case 'pptx':
-                              return { icon: FileText, bg: "bg-orange-50", text: "text-orange-500", label: "PPT" }
-                            case 'doc':
-                            case 'docx':
-                              return { icon: FileText, bg: "bg-blue-50", text: "text-blue-500", label: "Word" }
-                            case 'xls':
-                            case 'xlsx':
-                              return { icon: FileText, bg: "bg-green-50", text: "text-green-600", label: "Excel" }
-                            case 'txt':
-                              return { icon: FileText, bg: "bg-slate-100", text: "text-slate-500", label: "기타" }
-                            default:
-                              return { icon: Folder, bg: "bg-slate-100", text: "text-slate-500", label: "파일" }
-                          }
-                        }
-                        
-                        const fileInfo = getFileInfo(ref.name, ref.type)
-                        const IconComponent = fileInfo.icon
-                        
-                        // 다운로드 핸들러
-                        const handleDownload = async (e: React.MouseEvent) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          
-                          if (ref.type === "file" || ref.type === "text") {
-                            try {
-                              const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
-                              const response = await fetch(`${backendUrl}/api/references/${ref.id}/download`)
-                              if (!response.ok) throw new Error('다운로드 실패')
-                              
-                              const blob = await response.blob()
-                              const url = window.URL.createObjectURL(blob)
-                              const a = document.createElement('a')
-                              a.href = url
-                              
-                              // 텍스트 타입인 경우 파일명에 .txt 확장자 보장
-                              let downloadName = ref.name
-                              if (ref.type === "text" && !downloadName.toLowerCase().endsWith(".txt")) {
-                                downloadName += ".txt"
-                              }
-                              
-                              a.download = downloadName
-                              document.body.appendChild(a)
-                              a.click()
-                              window.URL.revokeObjectURL(url)
-                              document.body.removeChild(a)
-                            } catch (error) {
-                              console.error('참고 자료 다운로드 실패:', error)
-                              alert('참고 자료 다운로드에 실패했습니다.')
-                            }
-                          } else if (ref.url) {
-                            window.open(ref.url, '_blank')
-                          }
-                        }
-                        
+                      {factbook.references
+                        .filter(ref => ref.type === 'link')
+                        .map((ref) => {
                         return (
-                          <div 
+                          <a 
                             key={ref.id} 
+                            href={ref.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
                           >
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${fileInfo.bg} ${fileInfo.text}`}>
-                              <IconComponent className="w-5 h-5" />
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-amber-50 text-amber-500">
+                              <Link2 className="w-5 h-5" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="text-[13px] font-bold text-slate-800 truncate" title={ref.name}>{ref.name}</h4>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-slate-200 text-slate-400 font-medium">
-                                  {fileInfo.label}
+                                  링크
                                 </Badge>
-                                {ref.file_size && (
-                                  <span className="text-[10px] text-slate-400">{(ref.file_size / 1024).toFixed(1)} KB</span>
-                                )}
                               </div>
                             </div>
-                            {(ref.type === "file" || ref.type === "text" || ref.url) && (
-                              <button
-                                onClick={handleDownload}
-                                className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-blue-600 transition-all"
-                                title={ref.type === "file" || ref.type === "text" ? "다운로드" : "열기"}
-                              >
-                                {ref.type === "file" || ref.type === "text" ? (
-                                  <Download className="w-4 h-4" />
-                                ) : (
-                                  <ExternalLink className="w-4 h-4" />
-                                )}
-                              </button>
-                            )}
-                          </div>
+                            <ExternalLink className="w-4 h-4 text-slate-300" />
+                          </a>
                         )
                       })}
                     </div>
@@ -2307,7 +2442,85 @@ export default function FactbookDetailPage() {
                   </div>
                 </div>
               </div>
-            ) : activeTab === "images" ? (
+            ) : (activeTab as string) === "files" ? (
+              <div className="max-w-6xl mx-auto px-12">
+                <h2 className="text-2xl font-bold text-[#4D5D71] mb-10">참고 파일</h2>
+                
+                {factbook.references && factbook.references.filter(ref => ref.type === 'file' || ref.type === 'text').length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {factbook.references
+                      .filter(ref => ref.type === 'file' || ref.type === 'text')
+                      .map((ref) => {
+                      const getFileInfo = (name: string, type: string) => {
+                        if (type === "text") {
+                          return { icon: FileText, bg: "bg-emerald-50", text: "text-emerald-500", label: "텍스트" }
+                        }
+                        const ext = name?.split('.').pop()?.toLowerCase()
+                        switch(ext) {
+                          case 'pdf': return { icon: FileText, bg: "bg-red-50", text: "text-red-500", label: "PDF" }
+                          case 'ppt':
+                          case 'pptx': return { icon: FileText, bg: "bg-orange-50", text: "text-orange-500", label: "PPT" }
+                          case 'doc':
+                          case 'docx': return { icon: FileText, bg: "bg-blue-50", text: "text-blue-500", label: "Word" }
+                          case 'xls':
+                          case 'xlsx': return { icon: FileText, bg: "bg-green-50", text: "text-green-600", label: "Excel" }
+                          case 'txt': return { icon: FileText, bg: "bg-slate-100", text: "text-slate-500", label: "기타" }
+                          default: return { icon: Folder, bg: "bg-slate-100", text: "text-slate-500", label: "파일" }
+                        }
+                      }
+                      const fileInfo = getFileInfo(ref.name, ref.type)
+                      const IconComponent = fileInfo.icon
+                      const handleDownload = async (e: React.MouseEvent) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        try {
+                          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+                          const response = await fetch(`${backendUrl}/api/references/${ref.id}/download`)
+                          if (!response.ok) throw new Error('다운로드 실패')
+                          const blob = await response.blob()
+                          const url = window.URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          let downloadName = ref.name
+                          if (ref.type === "text" && !downloadName.toLowerCase().endsWith(".txt")) downloadName += ".txt"
+                          a.download = downloadName
+                          document.body.appendChild(a)
+                          a.click()
+                          window.URL.revokeObjectURL(url)
+                          document.body.removeChild(a)
+                        } catch (error) {
+                          console.error('참고 자료 다운로드 실패:', error)
+                          alert('참고 자료 다운로드에 실패했습니다.')
+                        }
+                      }
+                      return (
+                        <div key={ref.id} className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${fileInfo.bg} ${fileInfo.text}`}>
+                            <IconComponent className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[13px] font-bold text-slate-800 truncate" title={ref.name}>{ref.name}</h4>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-slate-200 text-slate-400 font-medium">
+                                {fileInfo.label}
+                              </Badge>
+                              {ref.file_size && <span className="text-[10px] text-slate-400">{(ref.file_size / 1024).toFixed(1)} KB</span>}
+                            </div>
+                          </div>
+                          <button onClick={handleDownload} className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-blue-600 transition-all" title="다운로드">
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
+                    <p className="text-slate-500 text-sm">등록된 참고 파일이 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            ) : (activeTab as string) === "images" ? (
               <div className="max-w-6xl mx-auto px-12">
                 <h2 className="text-2xl font-bold text-[#4D5D71] mb-4">이미지</h2>
                 

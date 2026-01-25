@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "팩트북 생성 AI Agent",
+  title: "팩트북 AI",
   description: "AI 기반 팩트북 자동 생성 시스템",
 };
 

@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect } from "react"
+import { useState, useEffect } from "react"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, X, Lock, Layout, BarChart3, Building2, Users, Target, Info, Sparkles, Trash2 } from "lucide-react"
+import { Plus, X, Lock, Layout, BarChart3, Building2, Users, Target, Info, Sparkles, Trash2, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 interface MenuConfigStepProps {
   formData: any
@@ -109,47 +110,35 @@ const MENU_ITEMS: MenuItem[] = [
     title: "시장 현황",
     icon: <BarChart3 className="w-4 h-4" />,
     isFixed: false,
-    defaultItems: [
-      "국내 광고/마케팅 시장의 최근 3년간 규모 및 연평균 성장률 분석",
-      "디지털 광고 시장의 메타, 구글, 유튜브 등 주요 플랫폼별 트렌드 및 성장 전망 분석",
-      "광고/마케팅 서비스의 AI 기술 도입, 크리에이티브 자동화, 데이터 기반 마케팅 등 최신 산업 트렌드 분석",
-    ],
+    defaultItems: [],
   },
   {
     id: "ownCompany",
     title: "자사 분석",
     icon: <Layout className="w-4 h-4" />,
     isFixed: false,
-    defaultItems: [
-      "대홍기획의 광고/마케팅 서비스별 핵심 USP 및 세부 역량 분석",
-      "대홍기획 주력 서비스의 출시 배경, 주요 업데이트 및 클라이언트 유치 캠페인 변화 과정 분석",
-      "대홍기획의 퍼포먼스 마케팅 서비스 제공 역량 및 성공 사례 분석",
-    ],
+    defaultItems: [],
   },
   {
     id: "competitor",
     title: "경쟁사 분석",
     icon: <Users className="w-4 h-4" />,
     isFixed: false,
-    defaultItems: [
-      "대홍기획의 주요 경쟁사(제일기획, 이노션, HSAD) 비교 (시장 점유율, 주요 클라이언트, 서비스 역량 등)",
-      "경쟁사(제일기획, 이노션, HSAD) 대비 대홍기획의 차별화 포인트 및 경쟁 우위 요소 도출",
-      "경쟁 환경에서 대홍기획의 시장 내 위치 및 역할 분석",
-    ],
+    defaultItems: [],
   },
   {
     id: "target",
     title: "타겟 분석",
     icon: <Target className="w-4 h-4" />,
     isFixed: false,
-    defaultItems: [
-      "광고/마케팅 서비스 클라이언트의 관심사, 가치관, 라이프스타일, 미디어 소비 패턴 등 심리/행동적 특성 분석",
-      "광고/마케팅 서비스에 대한 클라이언트의 미충족 니즈, 구매 고려 요인, 선호도 분석",
-    ],
+    defaultItems: [],
   },
 ]
 
 export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
+  const [isRecommending, setIsRecommending] = useState(false)
+  const { toast } = useToast()
+
   // 컴포넌트 마운트 시 company 섹션이 없으면 기본값으로 초기화
   useEffect(() => {
     if (!setFormData) return
@@ -168,6 +157,73 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
       }
     }
   }, []) // 마운트 시 한 번만 실행
+
+  const handleGetAIRecommendation = async () => {
+    if (!formData.companyName) {
+      toast({
+        title: "정보 부족",
+        description: "기업명을 먼저 입력해주세요.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!setFormData) return
+
+    setIsRecommending(true)
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+      const response = await fetch(`${backendUrl}/api/recommend-menu`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name: formData.companyName,
+          category: formData.category || "기타",
+          items: formData.items.map((item: any) => ({
+            id: item.id,
+            product_name: item.productName,
+            competitors: item.competitors,
+            proposals: item.proposals,
+            target_customers: item.targetCustomers
+          }))
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: "추천 실패" }))
+        throw new Error(errorData.detail || "목차 추천에 실패했습니다.")
+      }
+
+      const result = await response.json()
+      if (result.success && result.menu_recommendations) {
+        // 기존 company 항목은 유지하고 나머지만 업데이트
+        const updatedMenuItems = {
+          ...formData.menuItems,
+          ...result.menu_recommendations,
+          company: formData.menuItems?.company || MENU_ITEMS.find(m => m.id === "company")?.defaultItems
+        }
+
+        setFormData({
+          ...formData,
+          menuItems: updatedMenuItems
+        })
+
+        toast({
+          title: "추천 완료",
+          description: "AI 목차 추천이 완료되었습니다."
+        })
+      }
+    } catch (error) {
+      console.error("AI 목차 추천 실패:", error)
+      toast({
+        title: "추천 실패",
+        description: error instanceof Error ? error.message : "목차 추천 중 오류가 발생했습니다.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsRecommending(false)
+    }
+  }
 
   // 텍스트 영역 높이 자동 조절 (최대 3줄)
   useEffect(() => {
@@ -256,142 +312,184 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-none p-5">
       {/* 제목 및 가이드 섹션 */}
-      <div className="flex flex-col gap-1.5 border-b border-slate-100 pb-6">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-blue-50 rounded-lg">
-            <Sparkles className="w-4 h-4 text-blue-600" />
+      <div className="flex items-center justify-between border-b border-slate-100 pb-6">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-blue-50 rounded-lg">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+              목차 구성 설정
+            </h3>
           </div>
-          <h3 className="text-xl font-bold text-slate-900 tracking-tight">
-            목차 구성 설정
-          </h3>
+          <p className="text-[13px] text-slate-500 font-medium ml-9">
+            팩트북의 목차 항목을 확인하고 필요에 따라 수정하거나 추가할 수 있습니다.
+          </p>
         </div>
-        <p className="text-[13px] text-slate-500 font-medium ml-9">
-          팩트북의 목차 항목을 확인하고 필요에 따라 수정하거나 추가할 수 있습니다.
-        </p>
+
+        <Button
+          onClick={handleGetAIRecommendation}
+          disabled={isRecommending}
+          className={cn(
+            "relative overflow-hidden px-6 h-11 rounded-xl font-bold transition-all active:scale-95 shadow-sm",
+            "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border-0",
+            "disabled:opacity-70 disabled:cursor-not-allowed"
+          )}
+        >
+          {isRecommending ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>AI 추천 생성 중...</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              <span>AI 추천 받기</span>
+            </div>
+          )}
+        </Button>
       </div>
 
       {/* 메뉴 항목 리스트 - 그리드 레이아웃 */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {MENU_ITEMS.map((menu) => {
-          const items = getMenuItems(menu.id)
-          const canAdd = items.length < 10
-          const isCompanyInfo = menu.id === "company"
-
-          return (
-            <div 
-              key={menu.id} 
-              className="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col"
-            >
-              {/* 카드 헤더 */}
-              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-600 group-hover:text-blue-600 group-hover:border-blue-100 transition-colors">
-                    {menu.icon}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[15px] font-bold text-slate-800 tracking-tight">{menu.title}</span>
-                    <span className="text-[11px] text-slate-400 font-medium">총 {items.length}개 항목</span>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 text-[12px] font-semibold border-slate-200 bg-white hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all rounded-lg gap-1.5"
-                  onClick={() => handleAddItem(menu.id)}
-                  disabled={!canAdd}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  항목 추가
-                </Button>
+      <div className="relative min-h-[400px]">
+        {isRecommending ? (
+          <div className="absolute inset-0 z-20 bg-white rounded-3xl flex flex-col items-center justify-center animate-in fade-in duration-300">
+            <div className="flex flex-col items-center gap-5">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-slate-100 border-t-blue-600 animate-spin" />
+                <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-blue-600 animate-pulse" />
               </div>
-
-              {/* 세부 항목 리스트 */}
-              <div className="p-5 space-y-3 flex-1 bg-white">
-                {items.length === 0 ? (
-                  <div className="py-8 text-center border-2 border-dashed border-slate-100 rounded-xl">
-                    <p className="text-[13px] text-slate-400 font-medium">추가된 항목이 없습니다.</p>
-                  </div>
-                ) : (
-                  items.map((item: string, itemIdx: number) => {
-                    const isFixed = menu.isFixed && itemIdx < menu.defaultItems.length
-                    
-                    return (
-                      <div 
-                        key={itemIdx} 
-                        className={cn(
-                          "relative group/item flex items-start gap-3 p-3 rounded-xl border transition-all duration-200",
-                          isFixed 
-                            ? "bg-slate-50/50 border-slate-100" 
-                            : "bg-white border-slate-200 hover:border-blue-200 hover:shadow-sm"
-                        )}
-                      >
-                        <div className="mt-2.5 w-1.5 h-1.5 rounded-full bg-slate-300 group-hover/item:bg-blue-400 shrink-0" />
-                        <Textarea
-                          placeholder="내용을 입력하세요."
-                          value={item}
-                          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleUpdateItem(menu.id, itemIdx, e.target.value)}
-                          onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-                            const target = e.currentTarget;
-                            target.style.height = 'auto';
-                            target.style.height = `${Math.min(target.scrollHeight, 68)}px`;
-                          }}
-                          disabled={isFixed}
-                          className={cn(
-                            "menu-item-textarea flex-1 text-[13px] leading-relaxed min-h-[20px] max-h-[68px] p-0 bg-transparent border-none shadow-none focus-visible:ring-0 resize-none font-medium transition-all overflow-y-auto",
-                            isFixed ? "text-slate-500" : "text-slate-700"
-                          )}
-                        />
-                        {isFixed ? (
-                          <div className="p-1.5 text-slate-300">
-                            <Lock className="w-3.5 h-3.5" />
-                          </div>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveItem(menu.id, itemIdx)}
-                            className="shrink-0 h-8 w-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-          )
-        })}
-
-        {/* 매체 소재 분석 - 특수 기능 카드 */}
-        <div className="col-span-full mt-2">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-6 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-white border border-blue-100 shadow-sm flex items-center justify-center text-blue-600">
-                <Sparkles className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-[15px] font-bold text-slate-800">매체 소재 분석</h4>
-                  {/* <span className="px-2 py-0.5 bg-blue-600 text-[10px] font-bold text-white rounded-full tracking-wider">RECOMMENDED</span> */}
-                </div>
-                <p className="text-[12px] text-slate-500 font-medium leading-relaxed">
-                  자사 및 경쟁사의 매체별 소재(메타, 인스타그램, 구글, Youtube)
+              <div className="flex flex-col items-center gap-2 text-center">
+                <p className="text-lg font-bold text-slate-900">AI 목차 추천 중</p>
+                <p className="text-sm text-slate-500 font-medium">
+                  입력하신 정보를 바탕으로 목차를 추천하고 있습니다.<br />
+                  잠시만 기다려 주세요.
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4 bg-white/50 px-4 py-3 rounded-xl border border-blue-100/50">
-              <span className="text-[13px] font-bold text-slate-600">활성화</span>
-              <Switch
-                checked={formData.analysisItems?.media ?? false}
-                onCheckedChange={handleToggle}
-                className="data-[state=checked]:bg-blue-600"
-              />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-in fade-in duration-500">
+            {MENU_ITEMS.map((menu) => {
+              const items = getMenuItems(menu.id)
+              const canAdd = items.length < 10
+              const isCompanyInfo = menu.id === "company"
+
+              return (
+                <div 
+                  key={menu.id} 
+                  className="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col"
+                >
+                  {/* 카드 헤더 */}
+                  <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-600 group-hover:text-blue-600 group-hover:border-blue-100 transition-colors">
+                        {menu.icon}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[15px] font-bold text-slate-800 tracking-tight">{menu.title}</span>
+                        <span className="text-[11px] text-slate-400 font-medium">총 {items.length}개 항목</span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-3 text-[12px] font-semibold border-slate-200 bg-white hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all rounded-lg gap-1.5"
+                      onClick={() => handleAddItem(menu.id)}
+                      disabled={!canAdd}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      항목 추가
+                    </Button>
+                  </div>
+
+                  {/* 세부 항목 리스트 */}
+                  <div className="p-5 space-y-3 flex-1 bg-white">
+                    {items.length === 0 ? (
+                      <div className="py-8 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                        <p className="text-[13px] text-slate-400 font-medium">추가된 항목이 없습니다.</p>
+                      </div>
+                    ) : (
+                      items.map((item: string, itemIdx: number) => {
+                        const isFixed = menu.isFixed && itemIdx < menu.defaultItems.length
+                        
+                        return (
+                          <div 
+                            key={itemIdx} 
+                            className={cn(
+                              "relative group/item flex items-start gap-3 p-3 rounded-xl border transition-all duration-200",
+                              isFixed 
+                                ? "bg-slate-50/50 border-slate-100" 
+                                : "bg-white border-slate-200 hover:border-blue-200 hover:shadow-sm"
+                            )}
+                          >
+                            <div className="mt-2.5 w-1.5 h-1.5 rounded-full bg-slate-300 group-hover/item:bg-blue-400 shrink-0" />
+                            <Textarea
+                              placeholder="내용을 입력하세요."
+                              value={item}
+                              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleUpdateItem(menu.id, itemIdx, e.target.value)}
+                              onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+                                const target = e.currentTarget;
+                                target.style.height = 'auto';
+                                target.style.height = `${Math.min(target.scrollHeight, 68)}px`;
+                              }}
+                              disabled={isFixed}
+                              className={cn(
+                                "menu-item-textarea flex-1 text-[13px] leading-relaxed min-h-[20px] max-h-[68px] p-0 bg-transparent border-none shadow-none focus-visible:ring-0 resize-none font-medium transition-all overflow-y-auto",
+                                isFixed ? "text-slate-500" : "text-slate-700"
+                              )}
+                            />
+                            {isFixed ? (
+                              <div className="p-1.5 text-slate-300">
+                                <Lock className="w-3.5 h-3.5" />
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveItem(menu.id, itemIdx)}
+                                className="shrink-0 h-8 w-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* 매체 소재 분석 - 특수 기능 카드 */}
+            <div className="col-span-full mt-2">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-6 flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-blue-100 shadow-sm flex items-center justify-center text-blue-600">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-[15px] font-bold text-slate-800">매체 소재 분석</h4>
+                    </div>
+                    <p className="text-[12px] text-slate-500 font-medium leading-relaxed">
+                      자사 및 경쟁사의 매체별 소재(메타, 인스타그램, 구글, Youtube)
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 bg-white/50 px-4 py-3 rounded-xl border border-blue-100/50">
+                  <span className="text-[13px] font-bold text-slate-600">활성화</span>
+                  <Switch
+                    checked={formData.analysisItems?.media ?? false}
+                    onCheckedChange={handleToggle}
+                    className="data-[state=checked]:bg-blue-600"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+        )}
+      </div>    </div>
   )
 }

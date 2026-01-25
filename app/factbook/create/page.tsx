@@ -15,23 +15,10 @@ const DEFAULT_MENU_ITEMS: Record<string, string[]> = {
     "주요 사업 (사업 분야, 상품/서비스, 수익모델)",
     "재무 정보 (최근 3년 매출, 영업이익, 투자 및 비용 구조)",
   ],
-  market: [
-    "국내 광고/마케팅 시장의 최근 3년간 규모 및 연평균 성장률 분석",
-    "디지털 광고 시장의 메타, 구글, 유튜브 등 주요 플랫폼별 트렌드 및 성장 전망 분석",
-    "광고/마케팅 서비스의 AI 기술 도입, 크리에이티브 자동화, 데이터 기반 마케팅 등 최신 산업 트렌드 분석",
-  ],
-  ownCompany: [
-    "대홍기획의 광고/마케팅 서비스별 핵심 USP 및 세부 역량 분석",
-    "대홍기획 주력 서비스의 출시 배경, 주요 업데이트 및 클라이언트 유치 캠페인 변화 과정 분석",
-  ],
-  competitor: [
-    "대홍기획의 주요 경쟁사(제일기획, 이노션, HSAD) 비교 (시장 점유율, 주요 클라이언트, 서비스 역량 등)",
-    "경쟁사(제일기획, 이노션, HSAD) 대비 대홍기획의 차별화 포인트 및 경쟁 우위 요소 도출",
-  ],
-  target: [
-    "광고/마케팅 서비스 클라이언트의 관심사, 가치관, 라이프스타일, 미디어 소비 패턴 등 심리/행동적 특성 분석",
-    "광고/마케팅 서비스에 대한 클라이언트의 미충족 니즈, 구매 고려 요인, 선호도 분석",
-  ],
+  market: [],
+  ownCompany: [],
+  competitor: [],
+  target: [],
 }
 
 const getDefaultMenuItems = () =>
@@ -162,8 +149,8 @@ export default function CreateFactbookPage() {
         menu_items: cleanedMenuItems,
         analysis_items: formData.analysisItems,
         reference_materials: referenceMaterials,
-        // 하위 호환을 위한 더미 데이터
-        product_name: cleanedItems[0]?.product_name || "",
+        // 하위 호환을 위한 더미 데이터 -> 모든 제품명을 쉼표로 연결하여 저장
+        product_name: cleanedItems.map(item => item.product_name).join(", "),
         proposals: [],
         competitors: [],
         target_users: [],
