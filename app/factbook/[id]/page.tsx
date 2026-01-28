@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, ReactNode, createContext, useContext, memo, useCallback, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUp, Copy, Check, Download, FileSearch, Folder, Link2, Image as ImageIcon, Search, Building2, Globe, Star, Target, Tv, ExternalLink, ZoomIn, ZoomOut, RotateCcw, FileText, FilePieChart, FileSpreadsheet } from "lucide-react"
+import { ArrowLeft, ArrowUp, Copy, Check, Download, FileSearch, Folder, Link2, Image as ImageIcon, Search, Building2, Globe, Star, Target, Tv, ExternalLink, ZoomIn, ZoomOut, RotateCcw, FileText, FilePieChart, FileSpreadsheet, Trash2, MoreVertical } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { MediaTab } from "@/components/factbook/media-tab"
+import { RecommendationBar } from "@/components/factbook/recommendation-bar"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import * as AccordionPrimitive from "@radix-ui/react-accordion"
 import { ChevronDown } from "lucide-react"
@@ -27,6 +28,12 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Source {
   title: string
@@ -321,10 +328,12 @@ interface SubSection {
   content: string
   visualizations?: VisualizationItem[]
   sources?: Source[] // subSection 레벨에 sources 추가
+  related_questions?: string[] // 관련 질문 추가
 }
 
 interface Section {
   id: string
+  type: string // section_type (company, market, ownCompany, competitor, target)
   title: string
   subSections: SubSection[]
   sources?: Source[] // 선택적으로 유지 (계산용)
@@ -335,6 +344,7 @@ interface FactbookDetail {
   companyName: string
   productName: string
   category: string
+  status: string // draft, generating, completed, failed, queued
   sections: Section[]
   analysisItems?: {
     media?: boolean
@@ -1217,6 +1227,11 @@ export default function FactbookDetailPage() {
   const [isManualScroll, setIsManualScroll] = useState(false) // 수동 스크롤 여부
   const [isDeleting, setIsDeleting] = useState(false)
   const [isInputInfoOpen, setIsInputInfoOpen] = useState(false)
+  
+  // ✅ 전역 항목 추가 상태 (모든 섹션에서 공유)
+  const [isAddingItem, setIsAddingItem] = useState(false) // 어딘가에서 항목 추가 중인지
+  const [addingSection, setAddingSection] = useState<string | null>(null) // 어느 섹션에서 추가 중인지
+  
   const mainContentRef = useRef<HTMLDivElement>(null) // 메인 콘텐츠 스크롤 컨테이너 ref
   const { toast } = useToast()
 
@@ -1271,8 +1286,21 @@ export default function FactbookDetailPage() {
     };
   }, [updateNavIndicator, factbook]) // factbook 데이터 로드 시점 대응 추가
 
+  // ✅ 페이지 이탈 방지 (항목 추가 중일 때)
   useEffect(() => {
-    const fetchFactbook = async () => {
+    if (isAddingItem) {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        e.preventDefault()
+        e.returnValue = '항목 추가 중입니다. 페이지를 나가시겠습니까?'
+      }
+      
+      window.addEventListener('beforeunload', handleBeforeUnload)
+      return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [isAddingItem])
+
+  // 팩트북 조회 함수 (재사용 가능하도록 별도 정의)
+  const fetchFactbook = useCallback(async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
         const response = await fetch(`${backendUrl}/api/factbooks/${params.id}`)
@@ -1296,6 +1324,7 @@ export default function FactbookDetailPage() {
           companyName: data.company_name || "",
           productName: data.product_name || "",
           category: data.category || "",
+          status: data.status || "draft",
           analysisItems: data.analysis_items || { media: false },
           items: (data.items || []).map((item: any) => ({
             id: String(item.id),
@@ -1332,6 +1361,7 @@ export default function FactbookDetailPage() {
                 url: source.url || "",
                 imageUrl: source.imageUrl || undefined,
               })),
+                related_questions: subSection.related_questions || [],
               }
             })
 
@@ -1342,6 +1372,7 @@ export default function FactbookDetailPage() {
 
             return {
               id: String(section.id),
+              type: section.type || "", // section_type 추가
               title: section.title || "",
               subSections: subSectionsWithSources,
               sources: allSources, // 계산용으로 유지
@@ -1364,12 +1395,94 @@ export default function FactbookDetailPage() {
           variant: "destructive",
         })
       }
+  }, [params.id, toast])
+
+  // 항목 추가 후 새로 생성된 항목으로 스크롤
+  const handleItemAdded = useCallback(async (newItemId?: number) => {
+    await fetchFactbook()
+    if (newItemId != null) {
+      setTimeout(() => {
+        const el = document.getElementById(`section-${newItemId}`)
+        el?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }, 200)
     }
-    
+  }, [fetchFactbook])
+
+  // 항목 삭제 함수
+  const handleDeleteItem = useCallback(async (itemId: string, itemTitle: string) => {
+    if (!confirm(`'${itemTitle}'을(를) 삭제하시겠습니까?\n삭제된 항목은 복구할 수 없습니다.`)) {
+      return
+    }
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+      const res = await fetch(
+        `${backendUrl}/api/factbooks/${params.id}/items/${itemId}`,
+        { method: 'DELETE' }
+      )
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.detail || '항목 삭제에 실패했습니다')
+      }
+
+      // 성공
+      toast({
+        title: "✅ 항목 삭제 완료",
+        description: `'${itemTitle}'이(가) 삭제되었습니다`,
+      })
+
+      // 팩트북 재조회
+      await fetchFactbook()
+
+    } catch (error: any) {
+      console.error('항목 삭제 실패:', error)
+      toast({
+        title: "❌ 항목 삭제 실패",
+        description: error.message || "항목 삭제에 실패했습니다",
+        variant: "destructive"
+      })
+    }
+  }, [params.id, toast, fetchFactbook])
+
+  // 하위 항목 URL 복사 (해시 링크)
+  const handleShareSubSection = useCallback(async (subSectionId: string) => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}#section-${subSectionId}`
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast({
+        title: "✅ 링크가 복사되었습니다",
+        description: "이 항목의 링크를 공유할 수 있습니다.",
+      })
+    } catch (err) {
+      toast({
+        title: "❌ 복사 실패",
+        description: "링크를 복사할 수 없습니다.",
+        variant: "destructive",
+      })
+    }
+  }, [toast])
+
+  // 팩트북 조회 useEffect
+  useEffect(() => {
     if (params.id) {
       fetchFactbook()
     }
-  }, [params.id, toast])
+  }, [params.id, fetchFactbook])
+
+  // URL 해시(#section-xxx)로 진입 시 해당 하위 항목으로 스크롤
+  useEffect(() => {
+    if (!factbook) return
+    const hash = typeof window !== "undefined" ? window.location.hash : ""
+    if (!hash || !hash.startsWith("#section-")) return
+    const sectionId = hash.replace("#", "")
+    const el = document.getElementById(sectionId)
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "start" })
+      }, 300)
+    }
+  }, [factbook])
 
   useEffect(() => {
     const mainContent = mainContentRef.current
@@ -2175,14 +2288,38 @@ export default function FactbookDetailPage() {
                       <section
                         key={subSection.id}
                         id={`section-${subSection.id}`}
-                        className="scroll-mt-8"
+                        className="scroll-mt-8 group"
                       >
                         {/* Depth 2: 중분류 (H2) */}
                         <div className="flex items-center gap-3 mb-3 ml-3">
                           <div className="w-5 h-5 rounded-full bg-[#3b82f6] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
                             {ssIdx + 1}
                           </div>
-                          <h2 className="text-[18px] font-extrabold text-[#354355]">{subSection.title}</h2>
+                          <h2 className="text-[18px] font-extrabold text-[#354355] flex-1">{subSection.title}</h2>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                                title="더보기"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-[120px]">
+                              <DropdownMenuItem onClick={() => handleShareSubSection(subSection.id)}>
+                                <Link2 className="w-4 h-4 mr-2" />
+                                공유
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteItem(subSection.id, subSection.title)}
+                                variant="destructive"
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                삭제
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
 
                         {/* Depth 3 & 4 (H3 & Contents) via Markdown */}
@@ -2190,6 +2327,22 @@ export default function FactbookDetailPage() {
                           <div className="text-[#334155] text-sm leading-relaxed markdown-content">
                             {renderContentWithCharts(subSection)}
                           </div>
+
+                          {/* 추천 항목 바 - 각 SubSection 하단 */}
+                          {factbook.status === "completed" && subSection.related_questions && subSection.related_questions.length > 0 && (
+                            <RecommendationBar
+                              factbookId={Number(params.id)}
+                              sectionType={section.type}
+                              sectionTitle={section.title}
+                              relatedQuestions={subSection.related_questions}
+                              existingTitles={section.subSections.map(s => s.title)}
+                              onItemAdded={handleItemAdded}
+                              isAddingItem={isAddingItem}
+                              setIsAddingItem={setIsAddingItem}
+                              addingSection={addingSection}
+                              setAddingSection={setAddingSection}
+                            />
+                          )}
                         </div>
                       </section>
                     ))}
@@ -2355,7 +2508,7 @@ export default function FactbookDetailPage() {
                 {factbook.references && factbook.references.filter(ref => ref.type === 'link').length > 0 && (
                   <div className="mb-12">
                     <div className="flex items-center gap-2 mb-6 ml-1">
-                      <h3 className="text-[20px] font-extrabold text-[#354355]">참고 자료 (링크)</h3>
+                      <h3 className="text-[20px] font-extrabold text-[#354355]">참고 링크</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {factbook.references
@@ -2363,7 +2516,7 @@ export default function FactbookDetailPage() {
                         .map((ref) => {
                         return (
                           <a 
-                            key={ref.id} 
+                            key={ref.id}
                             href={ref.url}
                             target="_blank"
                             rel="noopener noreferrer"

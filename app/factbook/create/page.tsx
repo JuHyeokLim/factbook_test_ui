@@ -9,11 +9,11 @@ import { MenuConfigStep } from "@/components/factbook/steps/menu-config-step"
 
 const DEFAULT_MENU_ITEMS: Record<string, string[]> = {
   company: [
-    "기본 정보 (회사 로고, 회사 이름, 대표자, 주소, 홈페이지, 업종, 설립일)",
-    "철학 및 비전 (비전과 목표, CEO 메시지, 브랜드 보이스)",
-    "역사 (설립 배경, 주요 연혁)",
-    "주요 사업 (사업 분야, 상품/서비스, 수익모델)",
-    "재무 정보 (최근 3년 매출, 영업이익, 투자 및 비용 구조)",
+    "기본 정보 (기업명, 대표자, 설립일, 업종, 주소, 홈페이지)",
+    "철학 및 비전 (비전과 목표, CEO 메시지, 브랜드 보이스 등)",
+    "역사 (설립 배경, 주요 연혁 등)",
+    "주요 사업 (사업 분야, 상품/서비스, 수익모델 등)",
+    "재무 정보 (최근 3년 매출, 영업이익, 투자 및 비용 구조 등)",
   ],
   market: [],
   ownCompany: [],
@@ -248,7 +248,7 @@ export default function CreateFactbookPage() {
               {isSubmitting ? (
                 <span className="flex items-center gap-2">생성 중...</span>
               ) : currentStep === steps.length - 1 ? (
-                <span className="flex items-center gap-1.5">완료 <Check className="w-3.5 h-3.5" /></span>
+                <span className="flex items-center gap-1.5">팩트북 만들기 <Check className="w-3.5 h-3.5" /></span>
               ) : (
                 <span className="flex items-center gap-1.5">다음 단계 <ArrowRight className="w-3.5 h-3.5" /></span>
               )}

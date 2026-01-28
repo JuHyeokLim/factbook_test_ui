@@ -98,11 +98,11 @@ const MENU_ITEMS: MenuItem[] = [
     icon: <Building2 className="w-4 h-4" />,
     isFixed: true,
     defaultItems: [
-      "기본 정보 (회사 로고, 회사 이름, 대표자, 주소, 홈페이지, 업종, 설립일)",
-      "철학 및 비전 (비전과 목표, CEO 메시지, 브랜드 보이스)",
-      "역사 (설립 배경, 주요 연혁)",
-      "주요 사업 (사업 분야, 상품/서비스, 수익모델)",
-      "재무 정보 (최근 3년 매출, 영업이익, 투자 및 비용 구조)",
+      "기본 정보 (기업명, 대표자, 설립일, 업종, 주소, 홈페이지)",
+      "철학 및 비전 (비전과 목표, CEO 메시지, 브랜드 보이스 등)",
+      "역사 (설립 배경, 주요 연혁 등)",
+      "주요 사업 (사업 분야, 상품/서비스, 수익모델 등)",
+      "재무 정보 (최근 3년 매출, 영업이익, 투자 및 비용 구조 등)",
     ],
   },
   {
@@ -339,12 +339,12 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
           {isRecommending ? (
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>AI 추천 생성 중...</span>
+              <span>AI 목차 생성 중...</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
-              <span>AI 추천 받기</span>
+              <span>AI 목차 추천</span>
             </div>
           )}
         </Button>
@@ -474,7 +474,7 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
                       <h4 className="text-[15px] font-bold text-slate-800">매체 소재 분석</h4>
                     </div>
                     <p className="text-[12px] text-slate-500 font-medium leading-relaxed">
-                      자사 및 경쟁사의 매체별 소재(메타, 인스타그램, 구글, Youtube)
+                      자사 및 경쟁사의 매체별 소재(페이스북, 인스타그램, 구글, Youtube)
                     </p>
                   </div>
                 </div>
