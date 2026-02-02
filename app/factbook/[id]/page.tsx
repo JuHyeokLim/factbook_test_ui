@@ -2453,12 +2453,25 @@ export default function FactbookDetailPage() {
                             <img src={imgData.imageUrl} alt="" className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                           </div>
-                          {domain && (
-                            <div className="flex items-center gap-1.5 px-1">
+                          {(domain || imgData.sourceUrl) && (
+                            <div className="flex items-center gap-1.5 px-1 min-h-0">
                               {faviconUrl && (
                                 <img src={faviconUrl} alt="" className="w-3.5 h-3.5 flex-shrink-0" onError={(e) => e.currentTarget.style.display = 'none'} />
                               )}
-                              <span className="text-[11px] text-slate-500 truncate">{domain}</span>
+                              {imgData.sourceUrl ? (
+                                <a
+                                  href={imgData.sourceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[11px] text-slate-500 truncate hover:text-blue-600 hover:underline"
+                                  title={imgData.sourceUrl}
+                                >
+                                  {domain || imgData.sourceUrl}
+                                </a>
+                              ) : (
+                                domain && <span className="text-[11px] text-slate-500 truncate">{domain}</span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2699,12 +2712,25 @@ export default function FactbookDetailPage() {
                             <img src={imgData.imageUrl} alt="" className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                           </div>
-                          {domain && (
-                            <div className="flex items-center gap-1.5 px-1">
+                          {(domain || imgData.sourceUrl) && (
+                            <div className="flex items-center gap-1.5 px-1 min-h-0">
                               {faviconUrl && (
                                 <img src={faviconUrl} alt="" className="w-3.5 h-3.5 flex-shrink-0" onError={(e) => e.currentTarget.style.display = 'none'} />
                               )}
-                              <span className="text-[11px] text-slate-500 truncate">{domain}</span>
+                              {imgData.sourceUrl ? (
+                                <a
+                                  href={imgData.sourceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[11px] text-slate-500 truncate hover:text-blue-600 hover:underline"
+                                  title={imgData.sourceUrl}
+                                >
+                                  {domain || imgData.sourceUrl}
+                                </a>
+                              ) : (
+                                domain && <span className="text-[11px] text-slate-500 truncate">{domain}</span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2836,27 +2862,60 @@ export default function FactbookDetailPage() {
                     <div className="grid grid-cols-2 gap-2">
                       {activeImages.map((imageUrl, idx) => {
                         const isFailed = failedImages.has(imageUrl)
+                        const source = activeSources.find((s) => s.imageUrl === imageUrl)
+                        const sourceUrl = source?.url
+                        const getDomainFromUrl = (url?: string) => {
+                          if (!url) return null
+                          try {
+                            const urlObj = new URL(url)
+                            return urlObj.hostname.replace("www.", "")
+                          } catch { return null }
+                        }
+                        const domain = getDomainFromUrl(sourceUrl)
+                        const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : null
                         return (
-                          <div
-                            key={idx}
-                            onClick={() => !isFailed && handleImageClick(imageUrl)}
-                            className={`aspect-square bg-slate-200 rounded border border-slate-300 overflow-hidden group relative ${
-                              isFailed ? "" : "cursor-pointer hover:opacity-80 transition-opacity"
-                            }`}
-                          >
-                            {isFailed ? (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="text-xs text-slate-500">이미지</span>
+                          <div key={idx} className="flex flex-col gap-1">
+                            <div
+                              onClick={() => !isFailed && handleImageClick(imageUrl)}
+                              className={`aspect-square bg-slate-200 rounded border border-slate-300 overflow-hidden group relative ${
+                                isFailed ? "" : "cursor-pointer hover:opacity-80 transition-opacity"
+                              }`}
+                            >
+                              {isFailed ? (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <span className="text-xs text-slate-500">이미지</span>
+                                </div>
+                              ) : (
+                                <img
+                                  src={imageUrl}
+                                  alt={`Image ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                  onError={() => {
+                                    setFailedImages((prev) => new Set(prev).add(imageUrl))
+                                  }}
+                                />
+                              )}
+                            </div>
+                            {(domain || sourceUrl) && (
+                              <div className="flex items-center gap-1 px-0.5 min-h-0">
+                                {faviconUrl && (
+                                  <img src={faviconUrl} alt="" className="w-3 h-3 flex-shrink-0" onError={(e) => e.currentTarget.style.display = "none"} />
+                                )}
+                                {sourceUrl ? (
+                                  <a
+                                    href={sourceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-[10px] text-slate-500 truncate hover:text-blue-600 hover:underline"
+                                    title={sourceUrl}
+                                  >
+                                    {domain || sourceUrl}
+                                  </a>
+                                ) : (
+                                  domain && <span className="text-[10px] text-slate-500 truncate">{domain}</span>
+                                )}
                               </div>
-                            ) : (
-                              <img
-                                src={imageUrl}
-                                alt={`Image ${idx + 1}`}
-                                className="w-full h-full object-cover"
-                                onError={() => {
-                                  setFailedImages((prev) => new Set(prev).add(imageUrl))
-                                }}
-                              />
                             )}
                           </div>
                         )
@@ -2881,6 +2940,7 @@ export default function FactbookDetailPage() {
           onClose={handleCloseImageViewer}
           onPrevious={handlePreviousImage}
           onNext={handleNextImage}
+          sourceUrls={activeTab === "images" ? allImages.map(img => img.sourceUrl) : activeImages.map(imgUrl => activeSources.find(s => s.imageUrl === imgUrl)?.url)}
         />
       )}
 

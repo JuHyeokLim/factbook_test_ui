@@ -4,15 +4,26 @@ import { useEffect, useState, useRef } from "react"
 import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+function getDomainFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url)
+    return urlObj.hostname.replace("www.", "")
+  } catch {
+    return null
+  }
+}
+
 interface ImageViewerProps {
   images: string[]
   currentIndex: number
   onClose: () => void
   onPrevious: () => void
   onNext: () => void
+  /** 이미지별 출처 URL (순서는 images와 동일). 있으면 "출처 링크로 이동" 버튼 표시 */
+  sourceUrls?: (string | undefined)[]
 }
 
-export function ImageViewer({ images, currentIndex, onClose, onPrevious, onNext }: ImageViewerProps) {
+export function ImageViewer({ images, currentIndex, onClose, onPrevious, onNext, sourceUrls }: ImageViewerProps) {
   const [zoom, setZoom] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -187,6 +198,27 @@ export function ImageViewer({ images, currentIndex, onClose, onPrevious, onNext 
       >
         <Download className="w-6 h-6" />
       </Button>
+
+      {/* 출처 링크 (닫기/다운로드와 동일 높이·여백·호버 스타일, 아이콘 + 링크) */}
+      {sourceUrls?.[currentIndex] && (() => {
+        const sourceUrl = sourceUrls[currentIndex]!
+        const domain = getDomainFromUrl(sourceUrl)
+        const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : null
+        const displayText = domain || sourceUrl
+        return (
+          <button
+            type="button"
+            onClick={() => window.open(sourceUrl, "_blank", "noopener,noreferrer")}
+            className="absolute top-4 right-28 z-10 flex h-9 items-center gap-1.5 rounded-md px-3 text-white hover:bg-white/20 transition-colors max-w-[180px]"
+            title={sourceUrl}
+          >
+            {faviconUrl ? (
+              <img src={faviconUrl} alt="" className="size-4 flex-shrink-0 rounded-sm" onError={(e) => { e.currentTarget.style.display = "none" }} />
+            ) : null}
+            <span className="text-[11px] truncate">{displayText}</span>
+          </button>
+        )
+      })()}
 
       {/* 줌 컨트롤 버튼들 */}
       <div className="absolute top-4 left-4 flex items-center gap-2 z-10">

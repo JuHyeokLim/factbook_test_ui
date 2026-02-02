@@ -20,7 +20,6 @@ interface Factbook {
   updatedAt: string
   rawCreatedAt: string
   menuItems: any
-  viewCount?: number
   queuePosition?: number
   estimatedWaitTime?: number
 }
@@ -60,7 +59,6 @@ export function FactbookList() {
           createdAt: item.created_at ? new Date(item.created_at).toLocaleDateString("ko-KR") : "",
           updatedAt: item.updated_at ? new Date(item.updated_at).toLocaleDateString("ko-KR") : "",
           rawCreatedAt: item.created_at || "",
-          viewCount: 0,
           queuePosition: item.queue_position,
           estimatedWaitTime: item.estimated_wait_time,
         }))
@@ -162,8 +160,6 @@ export function FactbookList() {
     .sort((a, b) => {
       if (sortBy === "recent") {
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      } else if (sortBy === "popular") {
-        return (b.viewCount || 0) - (a.viewCount || 0)
       } else {
         return a.companyName.localeCompare(b.companyName)
       }
@@ -261,7 +257,6 @@ export function FactbookList() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="recent">최근 업데이트</SelectItem>
-            <SelectItem value="popular">인기순</SelectItem>
             <SelectItem value="name">가나다순</SelectItem>
           </SelectContent>
         </Select>
@@ -353,7 +348,6 @@ export function FactbookList() {
 
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p>생성: {factbook.createdAt}</p>
-                  <p>조회: {factbook.viewCount}회</p>
                 </div>
               </div>
             </Card>
@@ -370,7 +364,6 @@ export function FactbookList() {
                   <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                     <span>{factbook.category}</span>
                     <span>생성: {factbook.createdAt}</span>
-                    <span>조회: {factbook.viewCount}회</span>
                   </div>
                 </div>
 
