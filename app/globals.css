@@ -4,27 +4,27 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* AI Agent 테마로 업데이트 - 프리미엄 블루/그레이 색상 */
+  /* 메인 컬러: #295DFA (파란색) */
   --background: oklch(0.98 0 0);
   --foreground: oklch(0.15 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.15 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0 0);
-  --primary: oklch(0.35 0.15 260);
+  --primary: #295DFA;
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.95 0.02 250);
   --secondary-foreground: oklch(0.25 0 0);
   --muted: oklch(0.92 0 0);
   --muted-foreground: oklch(0.55 0 0);
-  --accent: oklch(0.5 0.12 220);
-  --accent-foreground: oklch(0.98 0 0);
+  --accent: #E8EEFE;
+  --accent-foreground: #1e3a5f;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
   --border: oklch(0.92 0 0);
   --input: oklch(0.95 0 0);
-  --ring: oklch(0.35 0.15 260);
-  --chart-1: oklch(0.35 0.15 260);
+  --ring: #295DFA;
+  --chart-1: #295DFA;
   --chart-2: oklch(0.5 0.12 220);
   --chart-3: oklch(0.65 0.1 200);
   --chart-4: oklch(0.45 0.13 240);
@@ -32,12 +32,12 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.98 0 0);
   --sidebar-foreground: oklch(0.15 0 0);
-  --sidebar-primary: oklch(0.35 0.15 260);
+  --sidebar-primary: #295DFA;
   --sidebar-primary-foreground: oklch(0.98 0 0);
   --sidebar-accent: oklch(0.95 0.02 250);
   --sidebar-accent-foreground: oklch(0.25 0 0);
   --sidebar-border: oklch(0.92 0 0);
-  --sidebar-ring: oklch(0.35 0.15 260);
+  --sidebar-ring: #295DFA;
 }
 
 .dark {
@@ -47,32 +47,32 @@
   --card-foreground: oklch(0.95 0 0);
   --popover: oklch(0.15 0 0);
   --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.55 0.16 260);
-  --primary-foreground: oklch(0.12 0 0);
+  --primary: #295DFA;
+  --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.25 0.02 250);
   --secondary-foreground: oklch(0.95 0 0);
   --muted: oklch(0.28 0 0);
   --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.65 0.13 220);
-  --accent-foreground: oklch(0.12 0 0);
+  --accent: #1E3A5F;
+  --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: oklch(0.28 0 0);
   --input: oklch(0.22 0 0);
-  --ring: oklch(0.55 0.16 260);
-  --chart-1: oklch(0.6 0.16 260);
+  --ring: #295DFA;
+  --chart-1: #295DFA;
   --chart-2: oklch(0.65 0.13 220);
   --chart-3: oklch(0.7 0.11 200);
   --chart-4: oklch(0.58 0.14 240);
   --chart-5: oklch(0.68 0.12 250);
   --sidebar: oklch(0.15 0 0);
   --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.55 0.16 260);
-  --sidebar-primary-foreground: oklch(0.12 0 0);
+  --sidebar-primary: #295DFA;
+  --sidebar-primary-foreground: oklch(0.98 0 0);
   --sidebar-accent: oklch(0.25 0.02 250);
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.28 0 0);
-  --sidebar-ring: oklch(0.55 0.16 260);
+  --sidebar-ring: #295DFA;
 }
 
 @theme inline {

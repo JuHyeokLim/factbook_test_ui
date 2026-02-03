@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MoreVertical, Eye, Grid3x3, List } from "lucide-react"
+import { MoreVertical, Eye, Grid3x3, List, ChevronLeft, ChevronRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
@@ -24,12 +24,16 @@ interface Factbook {
   estimatedWaitTime?: number
 }
 
+const PAGE_SIZE = 20
+
 export function FactbookList() {
   const [factbooks, setFactbooks] = useState<Factbook[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [category, setCategory] = useState("all")
   const [sortBy, setSortBy] = useState("recent")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid") // added view mode state
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
@@ -41,7 +45,13 @@ export function FactbookList() {
       }
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
-        const response = await fetch(`${backendUrl}/api/factbooks`)
+        const params = new URLSearchParams()
+        params.set("page", String(page))
+        params.set("limit", String(PAGE_SIZE))
+        params.set("sort", sortBy)
+        if (searchQuery.trim()) params.set("search", searchQuery.trim())
+        if (category && category !== "all") params.set("category", category)
+        const response = await fetch(`${backendUrl}/api/factbooks?${params.toString()}`)
 
         if (!response.ok) {
           throw new Error("팩트북 목록 조회 실패")
@@ -49,7 +59,7 @@ export function FactbookList() {
 
         const data = await response.json()
 
-        const factbooks: Factbook[] = (data.items || []).map((item: any) => ({
+        const items: Factbook[] = (data.items || []).map((item: any) => ({
           id: String(item.id),
           companyName: item.company_name || "",
           productName: item.product_name || "",
@@ -63,7 +73,13 @@ export function FactbookList() {
           estimatedWaitTime: item.estimated_wait_time,
         }))
 
-        setFactbooks(factbooks)
+        setFactbooks(items)
+        setTotal(data.total ?? 0)
+
+        // 현재 페이지가 비었고 이전 페이지가 있으면 이전 페이지로
+        if (items.length === 0 && data.page > 1 && (data.total ?? 0) > 0) {
+          setPage(data.page - 1)
+        }
       } catch (error) {
         console.error("팩트북 목록 조회 실패:", error)
         if (!silent) {
@@ -78,7 +94,7 @@ export function FactbookList() {
         }
       }
     },
-    [toast],
+    [page, searchQuery, category, sortBy, toast],
   )
 
   const calculateEstimatedCompletionTime = (factbook: Factbook) => {
@@ -133,6 +149,11 @@ export function FactbookList() {
     fetchFactbooks({ showLoading: true })
   }, [fetchFactbooks])
 
+  // 검색/업종/정렬 변경 시 1페이지로
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery, category, sortBy])
+
   useEffect(() => {
     if (!factbooks.length) {
       return
@@ -151,19 +172,7 @@ export function FactbookList() {
     }
   }, [factbooks, fetchFactbooks])
 
-  const filteredFactbooks = factbooks
-    .filter(
-      (fb) =>
-        fb.companyName.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        (category === "all" || fb.category === category),
-    )
-    .sort((a, b) => {
-      if (sortBy === "recent") {
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      } else {
-        return a.companyName.localeCompare(b.companyName)
-      }
-    })
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const handleShare = (id: string) => {
     const shareUrl = `${window.location.origin}/factbook/${id}`
@@ -190,8 +199,8 @@ export function FactbookList() {
         throw new Error(errorData.detail || "팩트북 삭제에 실패했습니다.")
       }
 
-      // 목록에서 제거
-      setFactbooks(factbooks.filter((fb) => fb.id !== id))
+      setFactbooks((prev) => prev.filter((fb) => fb.id !== id))
+      setTotal((prev) => Math.max(0, prev - 1))
       
       toast({
         title: "팩트북이 삭제되었습니다.",
@@ -218,10 +227,13 @@ export function FactbookList() {
         <Input
           placeholder="기업명으로 팩트북을 검색하세요"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value)
+            setPage(1)
+          }}
           className="flex-1"
         />
-        <Select value={category} onValueChange={setCategory}>
+        <Select value={category} onValueChange={(v) => { setCategory(v); setPage(1) }}>
           <SelectTrigger className="w-full md:w-48">
             <SelectValue placeholder="업종 선택" />
           </SelectTrigger>
@@ -251,7 +263,7 @@ export function FactbookList() {
             <SelectItem value="기타">기타</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={sortBy} onValueChange={setSortBy}>
+        <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(1) }}>
           <SelectTrigger className="w-full md:w-48">
             <SelectValue placeholder="정렬" />
           </SelectTrigger>
@@ -282,10 +294,10 @@ export function FactbookList() {
       </div>
 
       {/* Results Count */}
-      <div className="text-sm text-muted-foreground">총 {filteredFactbooks.length}개</div>
+      <div className="text-sm text-muted-foreground">총 {total}개</div>
 
       {/* Factbook Grid or List */}
-      {filteredFactbooks.length === 0 ? (
+      {factbooks.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📚</div>
           <p className="text-lg font-medium text-foreground mb-2">팩트북이 없습니다</p>
@@ -293,7 +305,7 @@ export function FactbookList() {
         </div>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredFactbooks.map((factbook) => (
+          {factbooks.map((factbook) => (
             <Card key={factbook.id} className="p-6 hover:shadow-lg transition-shadow flex flex-col">
               <div className="space-y-4 flex-1">
                 <div>
@@ -316,7 +328,7 @@ export function FactbookList() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <span className="inline-block text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
+                  <span className="inline-block text-xs bg-[#E8EEFE] text-[#295DFA] px-2 py-1 rounded font-medium">
                     {factbook.category}
                   </span>
                 </div>
@@ -355,7 +367,7 @@ export function FactbookList() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredFactbooks.map((factbook) => (
+          {factbooks.map((factbook) => (
             <Card key={factbook.id} className="p-4 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -410,6 +422,38 @@ export function FactbookList() {
               </div>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border">
+          <p className="text-sm text-muted-foreground">
+            {total}개 중 {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)} 표시
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              이전
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || loading}
+            >
+              다음
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

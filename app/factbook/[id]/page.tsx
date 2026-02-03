@@ -2029,7 +2029,7 @@ export default function FactbookDetailPage() {
                   }}
                   className={`flex items-center gap-2 px-1 h-full text-sm font-medium transition-colors ${
                     activeTab === "factbook"
-                      ? "text-[#1e293b]"
+                      ? "text-[#295DFA]"
                       : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
@@ -2045,7 +2045,7 @@ export default function FactbookDetailPage() {
                   }}
                   className={`flex items-center gap-2 px-1 h-full text-sm font-medium transition-colors ${
                     activeTab === "files"
-                      ? "text-[#1e293b]"
+                      ? "text-[#295DFA]"
                       : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
@@ -2061,7 +2061,7 @@ export default function FactbookDetailPage() {
                   }}
                   className={`flex items-center gap-2 px-1 h-full text-sm font-medium transition-colors ${
                     activeTab === "links"
-                      ? "text-[#1e293b]"
+                      ? "text-[#295DFA]"
                       : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
@@ -2077,7 +2077,7 @@ export default function FactbookDetailPage() {
                   }}
                   className={`flex items-center gap-2 px-1 h-full text-sm font-medium transition-colors ${
                     activeTab === "images"
-                      ? "text-[#1e293b]"
+                      ? "text-[#295DFA]"
                       : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
@@ -2085,9 +2085,9 @@ export default function FactbookDetailPage() {
                   <span>이미지</span>
                 </button>
 
-                {/* 슬라이딩 인디케이터 */}
+                {/* 슬라이딩 인디케이터 (메인 컬러) */}
                 <div
-                  className="absolute bottom-[-1px] h-[3px] bg-[#1e293b] rounded-t-full transition-all duration-300 ease-in-out"
+                  className="absolute bottom-[-1px] h-[3px] bg-[#295DFA] rounded-t-full transition-all duration-300 ease-in-out"
                   style={{
                     left: navIndicatorStyle.left,
                     width: navIndicatorStyle.width,
