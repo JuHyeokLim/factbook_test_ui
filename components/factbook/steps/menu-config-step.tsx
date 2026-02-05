@@ -462,7 +462,7 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
               )
             })}
 
-            {/* 매체 소재 분석 - 특수 기능 카드 */}
+            {/* 매체 소재 분석 - 비활성화 (주석 처리)
             <div className="col-span-full mt-2">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-6 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4">
@@ -488,6 +488,7 @@ export function MenuConfigStep({ formData, setFormData }: MenuConfigStepProps) {
                 </div>
               </div>
             </div>
+            */}
           </div>
         )}
       </div>    </div>

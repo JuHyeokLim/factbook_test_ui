@@ -420,6 +420,12 @@ const parseVisualizations = (
   cleanedContent = cleanedContent.replace(/<\/?think>/gi, "")
   cleanedContent = cleanedContent.replace(/<\/?reasoning>/gi, "")
   cleanedContent = cleanedContent.trim()
+
+  // 6) 시각화 오류 메시지 제거 — 그래프 오류 시 영역 미노출 (전각 괄호·공백·줄바꿈 변형 포함)
+  cleanedContent = cleanedContent
+    .replace(/\s*시각화 데이터\s*[\(（][^)）]+[\)）]\s*를\s*찾을\s*수\s*없습니다\.?\s*/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
   
   return { cleanedContent, visualizations }
 }
@@ -593,6 +599,7 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
           </TooltipTrigger>
           <TooltipContent side="top" className="text-[10px] px-2 py-1">JPG 다운로드</TooltipContent>
         </Tooltip>
+        {/* SVG 다운로드 버튼 숨김
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
             <button onClick={() => handleDownload('svg')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 text-[11px] font-bold text-slate-600 transition-all">
@@ -601,6 +608,7 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
           </TooltipTrigger>
           <TooltipContent side="top" className="text-[10px] px-2 py-1">SVG 다운로드</TooltipContent>
         </Tooltip>
+        */}
       </div>
       <div ref={chartRef} className="bg-white chart-tooltip-container">
         <div className="flex justify-center mb-4">
@@ -714,13 +722,9 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
     )
   }
 
-  const renderFallback = (message: string) => (
-    <div className="border border-slate-200 shadow-sm rounded-xl p-6 bg-white mb-6 my-6">
-      <Text className="text-xs text-slate-500">{message}</Text>
-    </div>
-  )
-  if (!data || data.length === 0) return renderFallback("시각화 데이터가 없어 차트를 표시할 수 없습니다.")
-  if (validationError) return renderFallback(`시각화 데이터 오류: ${validationError}`)
+  // 그래프 오류 시 영역 미노출 (에러 메시지 표시하지 않음)
+  if (!data || data.length === 0) return null
+  if (validationError) return null
   const finalData = sanitizedData || []
 
   const chartColors = colors && colors.length > 0 ? colors : ["blue", "emerald", "violet", "amber", "gray", "cyan", "pink", "indigo"]
@@ -819,7 +823,7 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
           <AreaChart {...commonProps} colors={displayColors} showLegend={false} />
         </ChartWrapper>
       )
-    default: return renderFallback(`${component} 타입 차트가 지원되지 않습니다.`)
+    default: return null
   }
 }
 
@@ -1840,7 +1844,12 @@ export default function FactbookDetailPage() {
   }
 
   const renderContentWithCharts = (subSection: SubSection) => {
-    const content = subSection.content || ""
+    let content = subSection.content || ""
+    // 시각화 오류 메시지 미노출 — 본문에 저장된 문구도 제거 (전각 괄호·공백·줄바꿈 변형 포함)
+    content = content
+      .replace(/\s*시각화 데이터\s*[\(（][^)）]+[\)）]\s*를\s*찾을\s*수\s*없습니다\.?\s*/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
     const visualizations = subSection.visualizations || []
     const sources = subSection.sources || []
     const regex = /\{\{([A-Z0-9_]+)\}\}/g
@@ -1869,18 +1878,13 @@ export default function FactbookDetailPage() {
       const viz = visualizations.find((v) => v.id === chartId)
       if (viz) {
         usedChartIds.add(chartId)
-      }
-      nodes.push(
-        <div key={`chart-${subSection.id}-${chartId}-${match.index}`} className="my-4">
-          {viz ? (
+        nodes.push(
+          <div key={`chart-${subSection.id}-${chartId}-${match.index}`} className="my-4">
             <ChartRenderer viz={viz} sources={sources} />
-          ) : (
-            <div className="text-xs text-slate-500 italic border border-dashed border-slate-300 rounded p-3">
-              {`시각화 데이터(${chartId})를 찾을 수 없습니다.`}
-            </div>
-          )}
-        </div>
-      )
+          </div>
+        )
+      }
+      // 그래프 오류 시(viz 없음) 영역 미노출 — 에러 메시지 표시하지 않음
 
       lastIndex = regex.lastIndex
     }

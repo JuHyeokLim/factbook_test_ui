@@ -48,7 +48,7 @@ export function RecommendationBar({
     if (relatedQuestions && relatedQuestions.length > 0) {
       const filtered = relatedQuestions
         .filter(q => !existingTitles.includes(q))
-        .slice(0, 3)
+        .slice(0, 2)
       setLocalRecommendations(filtered)
     }
   }, [relatedQuestions]) // existingTitles는 의존성에서 제거 (참조값이 매번 바뀌므로)
@@ -56,7 +56,7 @@ export function RecommendationBar({
   // 표시용 추천 목록 (현재 목록에서 이미 존재하는 항목은 실시간으로 필터링)
   const displayRecommendations = localRecommendations
     .filter(q => !existingTitles.includes(q))
-    .slice(0, 3)
+    .slice(0, 2)
 
   // AI로 다시 추천받기
   const handleRefresh = async () => {
@@ -81,7 +81,7 @@ export function RecommendationBar({
       
       toast({
         title: "✨ AI 추천 완료",
-        description: "새로운 주제 3개를 추천해 드립니다.",
+        description: "새로운 주제 2개를 추천해 드립니다.",
       })
     } catch (error: any) {
       console.error('추천 새로고침 실패:', error)

@@ -24,7 +24,7 @@ interface Factbook {
   estimatedWaitTime?: number
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 30
 
 export function FactbookList() {
   const [factbooks, setFactbooks] = useState<Factbook[]>([])
