@@ -97,7 +97,9 @@ export function FactbookList() {
     [page, searchQuery, category, sortBy, toast],
   )
 
-  const calculateEstimatedCompletionTime = (factbook: Factbook) => {
+  // const calculateEstimatedCompletionTime = (factbook: Factbook) => {
+  /** 예상 소요 시간(분). null이면 표시 불가. */
+  const calculateEstimatedCompletionMinutes = (factbook: Factbook): number | null => {
     if (!factbook.menuItems || !factbook.rawCreatedAt) return null
 
     const weights = {
@@ -129,20 +131,23 @@ export function FactbookList() {
       return total
     })
 
-    const maxSectionTimeSeconds = Math.max(...sectionTimes, 0) + 10 // buffer
-    
     // 대기 시간이 있으면 추가
-    const totalWaitSeconds = maxSectionTimeSeconds + (factbook.estimatedWaitTime || 0)
+    // const totalWaitSeconds = maxSectionTimeSeconds + (factbook.estimatedWaitTime || 0)
     
-    // 서버(UTC) 시간을 한국 시간(KST)으로 강제 변환하기 위해 9시간을 더함
-    const date = new Date(factbook.rawCreatedAt)
-    date.setHours(date.getHours() + 9)
-    date.setSeconds(date.getSeconds() + totalWaitSeconds)
+    // // 서버(UTC) 시간을 한국 시간(KST)으로 강제 변환하기 위해 9시간을 더함
+    // const date = new Date(factbook.rawCreatedAt)
+    // date.setHours(date.getHours() + 9)
+    // date.setSeconds(date.getSeconds() + totalWaitSeconds)
 
-    const h = String(date.getHours()).padStart(2, "0")
-    const m = String(date.getMinutes()).padStart(2, "0")
+    // const h = String(date.getHours()).padStart(2, "0")
+    // const m = String(date.getMinutes()).padStart(2, "0")
     
-    return `${h}:${m}`
+    // return `${h}:${m}`
+
+    const maxSectionTimeSeconds = Math.max(...sectionTimes, 0) + 10 // buffer
+    const totalWaitSeconds = maxSectionTimeSeconds + (factbook.estimatedWaitTime || 0) + 30 // 실제 완료가 예상보다 약 30초 늦어서 반영
+    const minutes = Math.max(1, Math.ceil(totalWaitSeconds / 60))
+    return minutes
   }
 
   useEffect(() => {
@@ -353,7 +358,8 @@ export function FactbookList() {
                       </span>
                     </div>
                     <div className="text-xs text-blue-600 font-medium ml-6">
-                      예상 완료 시간: {calculateEstimatedCompletionTime(factbook) || "--:--"}
+                      {/* 예상 완료 시간: {calculateEstimatedCompletionTime(factbook) || "--:--"} */}
+                      약 {calculateEstimatedCompletionMinutes(factbook) ?? "--"}분 소요 예정
                     </div>
                   </div>
                 )}
@@ -400,7 +406,8 @@ export function FactbookList() {
                         </span>
                       </div>
                       <div className="text-xs text-blue-600 font-medium ml-6">
-                        예상 완료: {calculateEstimatedCompletionTime(factbook) || "--:--"}
+                        {/* 예상 완료 시간: {calculateEstimatedCompletionTime(factbook) || "--:--"} */}
+                        약 {calculateEstimatedCompletionMinutes(factbook) ?? "--"}분 소요 예정
                       </div>
                     </div>
                   )}

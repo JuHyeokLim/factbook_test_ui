@@ -16,7 +16,24 @@ import { ImageViewer } from "@/components/factbook/image-viewer"
 import ReactMarkdown, { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeRaw from "rehype-raw"
-import { AreaChart, BarChart, Card, DonutChart, LineChart, Text, Title, Legend } from "@tremor/react"
+import { AreaChart, BarChart, Card, LineChart, Text, Title, Legend } from "@tremor/react"
+import {
+  ResponsiveContainer,
+  BarChart as RechartsBarChart,
+  Bar,
+  LineChart as RechartsLineChart,
+  Line,
+  AreaChart as RechartsAreaChart,
+  Area,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  CartesianGrid,
+  LabelList,
+} from "recharts"
 import { exportFactbookToWord } from "@/lib/exportUtils"
 import { toJpeg, toSvg } from 'html-to-image'
 
@@ -314,12 +331,14 @@ interface VisualizationItem {
   id: string
   component: "BarChart" | "LineChart" | "DonutChart" | "AreaChart"
   title?: string
+  insight?: string   // 제목 아래 한 줄 인사이트/결론 (So what?)
   data?: Record<string, any>[]
   index?: string
   categories?: string[]
   category?: string; // 추가: 백엔드가 단일 카테고리(라벨) 키를 줄 경우 대비
   value?: string;    // 추가: 백엔드가 단일 값 키를 줄 경우 대비
   colors?: string[]; // 추가: Tremor 차트 색상 배열
+  sourceRefs?: number[]; // 백엔드가 힌트에서 추출한 출처 번호 (참고 출처 1개 표시용)
 }
 
 interface SubSection {
@@ -435,6 +454,29 @@ const numberFormatter = (value: any) => {
   if (typeof value === "number") return value.toLocaleString("ko-KR")
   return String(value)
 }
+
+// Tremor 색상명 → hex (Bar/Line/Area 데이터 레이블용 Recharts fill)
+const CHART_COLOR_HEX: Record<string, string> = {
+  blue: "#3b82f6",
+  emerald: "#10b981",
+  violet: "#8b5cf6",
+  amber: "#f59e0b",
+  gray: "#9ca3af",
+  cyan: "#06b6d4",
+  pink: "#ec4899",
+  lime: "#84cc16",
+  fuchsia: "#d946ef",
+  green: "#22c55e",
+  red: "#ef4444",
+  indigo: "#6366f1",
+  purple: "#a855f7",
+  yellow: "#eab308",
+  teal: "#14b8a6",
+  orange: "#f97316",
+  sky: "#0ea5e9",
+  rose: "#f43f5e",
+}
+const getChartFill = (colorName: string) => CHART_COLOR_HEX[colorName] ?? CHART_COLOR_HEX.gray
 
 const sanitizeVisualizationData = (
   viz: VisualizationItem, 
@@ -611,14 +653,18 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
         */}
       </div>
       <div ref={chartRef} className="bg-white chart-tooltip-container">
-        <div className="flex justify-center mb-4">
+        <div className="flex flex-col items-center mb-4">
           <Title className="text-lg font-bold text-[#4D5D71]">{title}</Title>
+          {viz?.insight && (
+            <p className="text-sm text-slate-600 mt-2 px-4 py-2 rounded-r-md border-l-4 border-slate-300 bg-slate-50/80 max-w-2xl font-medium">
+              {viz.insight}
+            </p>
+          )}
         </div>
         {children}
         
-        {/* 차트 하단 출처 표시 */}
+        {/* 차트 하단 참고 출처 (1개만 표시): viz.data _출처 또는 백엔드 sourceRefs 사용 */}
         {viz && sources && sources.length > 0 && (() => {
-          // viz.data에서 모든 _출처 필드를 찾아서 출처 번호 추출
           const sourceNumbers = new Set<number>()
           if (viz.data && Array.isArray(viz.data)) {
             viz.data.forEach((row: any) => {
@@ -628,27 +674,29 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
                   if (matches) {
                     matches.forEach(match => {
                       const num = parseInt(match.replace(/[\[\]]/g, ""), 10)
-                      if (num > 0 && num <= sources.length) {
-                        sourceNumbers.add(num)
-                      }
+                      if (num > 0 && num <= sources.length) sourceNumbers.add(num)
                     })
                   }
                 }
               })
             })
           }
-          
-          const uniqueSources = Array.from(sourceNumbers).sort((a, b) => a - b).map(num => sources[num - 1]).filter(Boolean)
-          
+          if (sourceNumbers.size === 0 && viz.sourceRefs?.length) {
+            const ref = viz.sourceRefs[0]
+            if (ref >= 1 && ref <= sources.length) sourceNumbers.add(ref)
+          }
+          const sorted = Array.from(sourceNumbers).sort((a, b) => a - b)
+          const uniqueSources = sorted.map(num => sources[num - 1]).filter(Boolean)
           if (uniqueSources.length === 0) return null
-          
+          const displayRefs = sorted.slice(0, 1)
+          const displaySources = uniqueSources.slice(0, 1)
           return (
             <div className="mt-6 pt-4 border-t border-slate-200">
               <p className="text-xs font-semibold text-slate-600 mb-2">참고 출처</p>
               <div className="space-y-1">
-                {uniqueSources.map((source, idx) => (
+                {displaySources.map((source, idx) => (
                   <div key={idx} className="flex items-start gap-2 text-xs">
-                    <span className="text-slate-400 shrink-0">[{Array.from(sourceNumbers).sort((a, b) => a - b)[idx]}]</span>
+                    <span className="text-slate-400 shrink-0">[{displayRefs[idx]}]</span>
                     {source.url ? (
                       <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex-1 truncate" title={source.title}>
                         {source.title || source.url}
@@ -732,32 +780,67 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
   if (component === "DonutChart") {
     const measureKey = chartCategories[0]
     const donutLegendCategories = finalData.map(item => item[chartIndex])
-    
+
     // 선택된 항목만 강조하는 색상 배열 생성
-    const displayColors = activeCategory 
+    const displayColors = activeCategory
       ? finalData.map((item, idx) => item[chartIndex] === activeCategory ? chartColors[idx % chartColors.length] : "gray")
       : chartColors
+
+    const donutTooltipContent = ({ active, payload }: any) => customTooltip({ active, payload })
+    // Donut: Recharts 공식 — 0° = 3시, 반시계 방향. cos(-midAngle), sin(-midAngle)로 슬라이스와 정확히 정렬
+    const RADIAN = Math.PI / 180
+    const donutLabel = (props: any) => {
+      const { cx, cy, midAngle, innerRadius, outerRadius, percent, fill, payload } = props
+      if (percent == null) return null
+      const inR = Number(innerRadius) || 0
+      const outR = Number(outerRadius) || 0
+      const labelRadius = inR + (outR - inR) * 1.2 || outR * 1.2
+      const rad = -midAngle * RADIAN
+      const x = cx + labelRadius * Math.cos(rad)
+      const y = cy + labelRadius * Math.sin(rad)
+      const idx = payload != null ? finalData.findIndex((d: Record<string, unknown>) => d[chartIndex] === payload[chartIndex]) : -1
+      const textFill = fill ?? (idx >= 0 ? getChartFill(displayColors[idx] ?? "gray") : "#475569")
+      return (
+        <text x={x} y={y} textAnchor={x > cx ? "start" : "end"} dominantBaseline="central" fill={textFill} fontSize={11} fontWeight={600}>
+          {(percent * 100).toFixed(1)}%
+        </text>
+      )
+    }
 
     return (
       <ChartWrapper title={chartTitle} viz={viz} sources={sources}>
         <div className="flex justify-center mb-6">
-          <Legend 
-            categories={donutLegendCategories} 
-            colors={chartColors} 
+          <Legend
+            categories={donutLegendCategories}
+            colors={chartColors}
             className="flex-wrap justify-center gap-x-6 gap-y-3"
             activeLegend={activeCategory}
             onClickLegendItem={handleLegendClick}
           />
         </div>
-        <DonutChart 
-          data={finalData} 
-          category={measureKey} 
-          index={chartIndex} 
-          valueFormatter={numberFormatter} 
-          colors={displayColors} 
-          className="mt-2 h-48" 
-          customTooltip={customTooltip}
-        />
+        <div className="mt-2 h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsPieChart>
+              <RechartsTooltip content={donutTooltipContent} cursor={{ fill: "transparent" }} />
+              <Pie
+                data={finalData}
+                dataKey={measureKey}
+                nameKey={chartIndex}
+                cx="50%"
+                cy="50%"
+                innerRadius="60%"
+                outerRadius="85%"
+                paddingAngle={1}
+                label={donutLabel}
+                labelLine={false}
+              >
+                {finalData.map((_, idx) => (
+                  <Cell key={idx} fill={getChartFill(displayColors[idx] ?? "gray")} stroke="white" strokeWidth={2} />
+                ))}
+              </Pie>
+            </RechartsPieChart>
+          </ResponsiveContainer>
+        </div>
       </ChartWrapper>
     )
   }
@@ -767,63 +850,102 @@ const ChartRenderer = ({ viz, sources }: { viz: VisualizationItem, sources?: Sou
     ? chartCategories.map((cat, idx) => cat === activeCategory ? chartColors[idx % chartColors.length] : "gray")
     : chartColors
 
-  const commonProps = {
-    data: finalData,
-    index: chartIndex,
-    categories: chartCategories,
-    valueFormatter: numberFormatter,
-    className: "mt-4 h-72 pr-4",
-    customTooltip: customTooltip,
-    yAxisWidth: 80,
-  }
+  const chartMargin = { top: 20, right: 20, left: 20, bottom: 5 }
+  const chartMarginWithLabelSpace = { top: 28, right: 20, left: 20, bottom: 24 }
+  const rechartsTooltipContent = ({ active, payload }: any) => customTooltip({ active, payload })
+  const labelFormatter = (value: number) => numberFormatter(value)
+  const labelStyleWithBottomSpace = { fontSize: 11, fill: "#475569", fontWeight: 600 }
 
   switch (component) {
-    case "BarChart": 
+    case "BarChart":
       return (
         <ChartWrapper title={chartTitle} viz={viz} sources={sources}>
           <div className="flex justify-end mb-4">
-            <Legend 
-              categories={chartCategories} 
-              colors={chartColors} 
+            <Legend
+              categories={chartCategories}
+              colors={chartColors}
               className="flex-wrap justify-end gap-x-6 gap-y-3"
               activeLegend={activeCategory}
               onClickLegendItem={handleLegendClick}
             />
           </div>
-          <BarChart {...commonProps} colors={displayColors} showLegend={false} />
+          <div className="mt-4 h-72 pr-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsBarChart data={finalData} margin={chartMargin}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" stroke="#e2e8f0" />
+                <XAxis dataKey={chartIndex} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={(v) => numberFormatter(v)} width={80} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} />
+                <RechartsTooltip content={rechartsTooltipContent} cursor={{ fill: "#f1f5f9" }} />
+                {chartCategories.map((cat, idx) => (
+                  <Bar key={cat} dataKey={cat} fill={getChartFill(displayColors[idx] ?? "gray")} radius={[4, 4, 0, 0]} maxBarSize={48}>
+                    <LabelList position="top" formatter={labelFormatter} style={{ fontSize: 11, fill: "#475569", fontWeight: 600 }} />
+                  </Bar>
+                ))}
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          </div>
         </ChartWrapper>
       )
-    case "LineChart": 
+    case "LineChart":
       return (
         <ChartWrapper title={chartTitle} viz={viz} sources={sources}>
           <div className="flex justify-end mb-4">
-            <Legend 
-              categories={chartCategories} 
-              colors={chartColors} 
+            <Legend
+              categories={chartCategories}
+              colors={chartColors}
               className="flex-wrap justify-end gap-x-6 gap-y-3"
               activeLegend={activeCategory}
               onClickLegendItem={handleLegendClick}
             />
           </div>
-          <LineChart {...commonProps} colors={displayColors} showLegend={false} />
+          <div className="mt-4 h-72 pr-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsLineChart data={finalData} margin={chartMarginWithLabelSpace}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" stroke="#e2e8f0" />
+                <XAxis dataKey={chartIndex} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} padding={{ left: 30 }} />
+                <YAxis tickFormatter={(v) => numberFormatter(v)} width={80} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} />
+                <RechartsTooltip content={rechartsTooltipContent} cursor={{ stroke: "#94a3b8" }} />
+                {chartCategories.map((cat, idx) => (
+                  <Line key={cat} type="monotone" dataKey={cat} stroke={getChartFill(displayColors[idx] ?? "gray")} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
+                    <LabelList position="top" formatter={labelFormatter} style={labelStyleWithBottomSpace} offset={10} />
+                  </Line>
+                ))}
+              </RechartsLineChart>
+            </ResponsiveContainer>
+          </div>
         </ChartWrapper>
       )
-    case "AreaChart": 
+    case "AreaChart":
       return (
         <ChartWrapper title={chartTitle} viz={viz} sources={sources}>
           <div className="flex justify-end mb-4">
-            <Legend 
-              categories={chartCategories} 
-              colors={chartColors} 
+            <Legend
+              categories={chartCategories}
+              colors={chartColors}
               className="flex-wrap justify-end gap-x-6 gap-y-3"
               activeLegend={activeCategory}
               onClickLegendItem={handleLegendClick}
             />
           </div>
-          <AreaChart {...commonProps} colors={displayColors} showLegend={false} />
+          <div className="mt-4 h-72 pr-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsAreaChart data={finalData} margin={chartMarginWithLabelSpace}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" stroke="#e2e8f0" />
+                <XAxis dataKey={chartIndex} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} padding={{ left: 30 }} />
+                <YAxis tickFormatter={(v) => numberFormatter(v)} width={80} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} />
+                <RechartsTooltip content={rechartsTooltipContent} cursor={{ stroke: "#94a3b8" }} />
+                {chartCategories.map((cat, idx) => (
+                  <Area key={cat} type="monotone" dataKey={cat} fill={getChartFill(displayColors[idx] ?? "gray")} stroke={getChartFill(displayColors[idx] ?? "gray")} strokeWidth={2} fillOpacity={0.3}>
+                    <LabelList position="top" formatter={labelFormatter} style={labelStyleWithBottomSpace} offset={10} />
+                  </Area>
+                ))}
+              </RechartsAreaChart>
+            </ResponsiveContainer>
+          </div>
         </ChartWrapper>
       )
-    default: return null
+    default:
+      return null
   }
 }
 
