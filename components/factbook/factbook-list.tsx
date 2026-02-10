@@ -106,7 +106,7 @@ export function FactbookList() {
       dart_basic: 10,
       dart_finance: 35, // 15 + viz*2
       pplx_normal: 25,
-      pplx_deep: 45, // 35 + viz*1
+      pplx_deep: 60, // 35 + viz*1
     }
 
     const sectionTimes = Object.keys(factbook.menuItems).map((section) => {

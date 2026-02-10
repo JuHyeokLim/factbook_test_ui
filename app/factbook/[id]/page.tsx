@@ -478,6 +478,9 @@ const CHART_COLOR_HEX: Record<string, string> = {
 }
 const getChartFill = (colorName: string) => CHART_COLOR_HEX[colorName] ?? CHART_COLOR_HEX.gray
 
+/** 차트 제목 아래 한 줄 인사이트 표시 여부 (정확도 검증 전 비활성화) */
+const SHOW_CHART_INSIGHT = false
+
 const sanitizeVisualizationData = (
   viz: VisualizationItem, 
   indexKey: string, 
@@ -655,7 +658,7 @@ const ChartWrapper = ({ children, title, viz, sources }: { children: React.React
       <div ref={chartRef} className="bg-white chart-tooltip-container">
         <div className="flex flex-col items-center mb-4">
           <Title className="text-lg font-bold text-[#4D5D71]">{title}</Title>
-          {viz?.insight && (
+          {SHOW_CHART_INSIGHT && viz?.insight && (
             <p className="text-sm text-slate-600 mt-2 px-4 py-2 rounded-r-md border-l-4 border-slate-300 bg-slate-50/80 max-w-2xl font-medium">
               {viz.insight}
             </p>
